@@ -2,7 +2,7 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <h2 class="text-xl font-semibold leading-tight text-gray-800">
-                {{ __('Airline Commissions') }}
+                {{ __('Legacy Airline Commissions') }}
             </h2>
             <a href="{{ route('admin.dashboard') }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-500">
                 ← Back to Dashboard
@@ -12,6 +12,11 @@
 
     <div class="py-6">
         <div class="mx-auto max-w-7xl space-y-8 sm:px-6 lg:px-8">
+            <div class="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-800">
+                The new <a href="{{ route('admin.pricing.index') }}" class="font-semibold underline">Pricing Rules</a> experience now manages commissions, discounts, and fees.
+                This legacy screen remains available for reference during rollout.
+            </div>
+
             <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
                 <h3 class="text-lg font-semibold text-gray-900">Create Commission Rule</h3>
                 <p class="mt-1 text-sm text-gray-500">Define the default markup you want to apply for a carrier.</p>

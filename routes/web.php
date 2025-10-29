@@ -4,6 +4,7 @@ use App\Http\Controllers\Admin\AdminDashboardController;
 use App\Http\Controllers\Admin\AirlineCommissionController;
 use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\PaymentController;
+use App\Http\Controllers\Admin\PricingRuleController;
 use App\Http\Controllers\Bookings\BookingController as UserBookingController;
 use App\Http\Controllers\Bookings\BookingDemoController;
 use App\Http\Controllers\FlightSearchController;
@@ -48,6 +49,11 @@ Route::middleware('auth')->group(function () {
 
 Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', AdminDashboardController::class)->name('dashboard');
+    Route::get('pricing', [PricingRuleController::class, 'index'])->name('pricing.index');
+    Route::post('pricing/rules', [PricingRuleController::class, 'store'])->name('pricing.rules.store');
+    Route::put('pricing/rules/{pricingRule}', [PricingRuleController::class, 'update'])->name('pricing.rules.update');
+    Route::delete('pricing/rules/{pricingRule}', [PricingRuleController::class, 'destroy'])->name('pricing.rules.destroy');
+    Route::post('pricing/import-legacy', [PricingRuleController::class, 'importLegacy'])->name('pricing.import-legacy');
     Route::resource('airline-commissions', AirlineCommissionController::class)->except(['create', 'edit', 'show']);
     Route::resource('bookings', AdminBookingController::class)->only(['index', 'show']);
     Route::resource('payments', PaymentController::class)->only(['index', 'show']);

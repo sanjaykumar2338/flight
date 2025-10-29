@@ -25,7 +25,31 @@ class BookingFactory extends Factory
             'priced_offer_ref' => $this->faker->uuid(),
             'primary_carrier' => strtoupper($this->faker->lexify('??')),
             'itinerary_json' => json_encode(['segments' => []], JSON_THROW_ON_ERROR),
-            'pricing_json' => json_encode(['total' => 450], JSON_THROW_ON_ERROR),
+            'pricing_json' => json_encode([
+                'ndc' => [
+                    'base_amount' => 400,
+                    'tax_amount' => 40,
+                    'total_amount' => 440,
+                ],
+                'payable_total' => 450,
+                'components' => [
+                    'base_fare' => 400,
+                    'taxes' => 40,
+                    'adjustments' => 10,
+                ],
+                'rules_applied' => [],
+                'engine' => [
+                    'enabled' => false,
+                    'used' => false,
+                    'result' => null,
+                ],
+                'legacy' => [
+                    'commission_amount' => 10,
+                    'percent_rate' => 2.5,
+                    'flat_component' => 0,
+                    'source' => 'default',
+                ],
+            ], JSON_THROW_ON_ERROR),
         ];
     }
 }

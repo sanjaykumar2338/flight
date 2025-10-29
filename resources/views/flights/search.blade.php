@@ -131,44 +131,121 @@
             @endif
 
             @if (!empty($pricedOffer) && $pricedBooking)
-                <div class="rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
+                @php
+                    $pricing = $pricedOffer['pricing'] ?? [];
+                    $currency = $pricedOffer['currency'] ?? config('travelndc.currency', 'USD');
+                    $ndc = $pricing['ndc'] ?? [];
+                    $baseFare = $ndc['base_amount'] ?? ($pricing['base_amount'] ?? 0);
+                    $taxes = $ndc['tax_amount'] ?? ($pricing['tax_amount'] ?? 0);
+                    $adjustments = $pricing['components']['adjustments'] ?? round(($pricing['payable_total'] ?? 0) - ($baseFare + $taxes), 2);
+                    $rulesApplied = $pricing['rules_applied'] ?? [];
+                    $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
+                    $engineUsed = data_get($pricing, 'engine.used', false);
+                    $legacySource = data_get($pricing, 'legacy.source');
+                @endphp
+                <div class="rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
                     <div class="flex flex-col gap-4">
                         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p class="font-semibold">Latest Offer Pricing</p>
                                 <p class="text-sm">
                                     Offer {{ $pricedOffer['offer_id'] }} ({{ $pricedOffer['owner'] }}):
-                                    {{ $pricedOffer['currency'] }}
-                                    {{ number_format($pricedOffer['pricing']['payable_total'], 2) }}
+                                    {{ $currency }} {{ number_format($pricing['payable_total'] ?? 0, 2) }}
                                 </p>
-                                <p class="text-xs text-gray-700 md:max-w-sm">
-                                    Breakdown: Base {{ $pricedOffer['currency'] }}
-                                    {{ number_format($pricedOffer['pricing']['components']['base_fare'] ?? $pricedOffer['pricing']['ndc']['base_amount'] ?? 0, 2) }}
-                                    + Taxes {{ $pricedOffer['currency'] }}
-                                    {{ number_format($pricedOffer['pricing']['components']['taxes'] ?? $pricedOffer['pricing']['ndc']['tax_amount'] ?? 0, 2) }}
-                                    + Commission {{ $pricedOffer['currency'] }}
-                                    {{ number_format($pricedOffer['pricing']['components']['commission'] ?? $pricedOffer['pricing']['commission']['commission_amount'] ?? 0, 2) }}
-                                    = {{ $pricedOffer['currency'] }}
-                                    {{ number_format($pricedOffer['pricing']['payable_total'], 2) }}
-                                </p>
+                                <div class="mt-2 flex flex-wrap gap-2 text-xs text-emerald-800">
+                                    <span class="inline-flex items-center rounded-full bg-white/70 px-2 py-1 font-semibold">
+                                        {{ $engineUsed ? 'Pricing rules applied' : 'Legacy pricing' }}
+                                    </span>
+                                    <span class="inline-flex items-center rounded-full bg-white/70 px-2 py-1 font-semibold">
+                                        {{ $ruleCount }} {{ \Illuminate\Support\Str::plural('adjustment', $ruleCount) }}
+                                    </span>
+                                </div>
                             </div>
-                            <div class="rounded bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-900">
-                                Commission ({{ $pricedOffer['pricing']['commission']['percent_rate'] ?? $pricedOffer['pricing']['markup']['percent_rate'] ?? 0 }}%):
-                                {{ number_format($pricedOffer['pricing']['commission']['commission_amount'] ?? $pricedOffer['pricing']['markup']['markup_amount'] ?? 0, 2) }}
+                            <div class="rounded bg-white px-3 py-2 text-sm font-semibold {{ $adjustments >= 0 ? 'text-emerald-700' : 'text-rose-600' }} shadow-sm">
+                                Adjustments: {{ $adjustments >= 0 ? '+' : '' }}{{ number_format($adjustments, 2) }}
                             </div>
                         </div>
 
                         <div class="grid gap-4 md:grid-cols-2">
                             <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
+                                <p class="text-xs uppercase tracking-wide text-gray-500">Fare Summary</p>
+                                <dl class="mt-2 space-y-2 text-sm text-gray-700">
+                                    <div class="flex items-center justify-between">
+                                        <dt>Base fare</dt>
+                                        <dd class="font-semibold">{{ $currency }} {{ number_format($baseFare, 2) }}</dd>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <dt>Taxes</dt>
+                                        <dd class="font-semibold">{{ $currency }} {{ number_format($taxes, 2) }}</dd>
+                                    </div>
+                                    <div class="flex items-center justify-between {{ $adjustments >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                                        <dt>Adjustments</dt>
+                                        <dd class="font-semibold">{{ $adjustments >= 0 ? '+' : '' }}{{ number_format($adjustments, 2) }}</dd>
+                                    </div>
+                                    <div class="flex items-center justify-between font-bold text-indigo-700">
+                                        <dt>Total payable</dt>
+                                        <dd>{{ $currency }} {{ number_format($pricing['payable_total'] ?? 0, 2) }}</dd>
+                                    </div>
+                                </dl>
+                            </div>
+                            <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
                                 <p class="text-xs uppercase tracking-wide text-gray-500">Booking Ref</p>
                                 <p class="text-lg font-semibold text-gray-800">#{{ $pricedBooking->id }}</p>
                                 <p class="mt-1 text-sm text-gray-600">Status: {{ ucfirst($pricedBooking->status) }}</p>
-                            </div>
-                            <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
-                                <p class="text-xs uppercase tracking-wide text-gray-500">Payment Reference</p>
+                                <p class="mt-3 text-xs uppercase tracking-wide text-gray-500">Payment Reference</p>
                                 <p class="text-sm text-gray-700">{{ $pricedBooking->payment_reference ?? '—' }}</p>
-                                <p class="mt-1 text-xs text-gray-500">Total payable: {{ $pricedOffer['currency'] }} {{ number_format($pricedOffer['pricing']['payable_total'], 2) }}</p>
+                                <p class="mt-1 text-xs text-gray-500">Total payable: {{ $currency }} {{ number_format($pricing['payable_total'] ?? 0, 2) }}</p>
                             </div>
+                        </div>
+
+                        <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
+                            <p class="text-xs uppercase tracking-wide text-gray-500">Pricing Breakdown</p>
+                            @if ($ruleCount > 0)
+                                <div class="mt-3 overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 text-xs">
+                                        <thead class="bg-gray-50 text-gray-600">
+                                            <tr>
+                                                <th class="px-2 py-2 text-left font-semibold">Rule</th>
+                                                <th class="px-2 py-2 text-left font-semibold">Kind</th>
+                                                <th class="px-2 py-2 text-left font-semibold">Basis</th>
+                                                <th class="px-2 py-2 text-right font-semibold">Impact</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            @foreach ($rulesApplied as $rule)
+                                                @php
+                                                    $label = $rule['label'] ?? ($rule['id'] ? 'Rule #' . $rule['id'] : 'Adjustment');
+                                                    $details = array_filter([
+                                                        isset($rule['percent']) ? number_format((float) $rule['percent'], 2) . '%' : null,
+                                                        isset($rule['flat_amount']) ? $currency . ' ' . number_format((float) $rule['flat_amount'], 2) : null,
+                                                        isset($rule['fee_percent']) ? number_format((float) $rule['fee_percent'], 2) . '% fee' : null,
+                                                        isset($rule['fixed_fee']) ? $currency . ' ' . number_format((float) $rule['fixed_fee'], 2) : null,
+                                                    ]);
+                                                    $impactAmount = (float) ($rule['impact_amount'] ?? 0);
+                                                @endphp
+                                                <tr>
+                                                    <td class="px-2 py-2">
+                                                        <div class="font-semibold text-gray-800">{{ $label }}</div>
+                                                        @if (!empty($details))
+                                                            <div class="text-[11px] text-gray-500">{{ implode(' · ', $details) }}</div>
+                                                        @endif
+                                                    </td>
+                                                    <td class="px-2 py-2 text-gray-700">{{ $rule['kind'] ?? '—' }}</td>
+                                                    <td class="px-2 py-2 text-gray-700">{{ $rule['basis'] ?? '—' }}</td>
+                                                    <td class="px-2 py-2 text-right font-semibold {{ $impactAmount >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                                                        {{ $rule['impact'] ?? ($impactAmount >= 0 ? '+' : '') . number_format($impactAmount, 2) }}
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <p class="mt-2 text-sm text-gray-600">No pricing rules matched; legacy defaults were used.</p>
+                            @endif
+                            @if (!$engineUsed && $legacySource)
+                                <p class="mt-2 text-xs text-gray-500">Legacy source: {{ \Illuminate\Support\Str::title($legacySource) }}</p>
+                            @endif
                         </div>
 
                         <form method="POST" action="{{ route('checkout.paystack') }}" class="space-y-3">
@@ -206,6 +283,10 @@
                                 'offer_items' => $offer['offer_items'] ?? [],
                                 'segments' => $offer['segments'] ?? [],
                                 'primary_carrier' => $offer['primary_carrier'] ?? $offer['owner'],
+                                'pricing' => [
+                                    'context' => $offer['pricing_context'] ?? ($offer['pricing']['context'] ?? []),
+                                    'passengers' => $offer['passenger_summary'] ?? ($offer['pricing']['passengers'] ?? []),
+                                ],
                             ], JSON_UNESCAPED_SLASHES) ?: '');
                         @endphp
 
@@ -258,37 +339,53 @@
                                 </div>
                             </div>
 
+                            @php
+                                $pricingData = $offer['pricing'] ?? [];
+                                $ndc = $pricingData['ndc'] ?? [];
+                                $baseFare = $ndc['base_amount'] ?? ($pricingData['base_amount'] ?? 0);
+                                $taxes = $ndc['tax_amount'] ?? ($pricingData['tax_amount'] ?? 0);
+                                $adjustments = $pricingData['components']['adjustments'] ?? round(($pricingData['payable_total'] ?? 0) - ($baseFare + $taxes), 2);
+                                $engineUsed = data_get($pricingData, 'engine.used', false);
+                                $rulesApplied = $pricingData['rules_applied'] ?? [];
+                                $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
+                                $currency = $offer['currency'] ?? config('travelndc.currency', 'USD');
+                            @endphp
                             <div class="mt-4 space-y-3 border-t border-gray-100 pt-4 text-sm">
                                 <div class="flex items-center justify-between">
                                     <span class="text-gray-500">Base Fare</span>
                                     <span class="font-semibold text-gray-900">
-                                        {{ $offer['currency'] ?? config('travelndc.currency', 'USD') }}
-                                        {{ number_format($offer['pricing']['components']['base_fare'] ?? $offer['pricing']['base_amount'] ?? 0, 2) }}
+                                        {{ $currency }} {{ number_format($baseFare, 2) }}
                                     </span>
                                 </div>
                                 <div class="flex items-center justify-between">
                                     <span class="text-gray-500">Taxes</span>
                                     <span class="font-semibold text-gray-900">
-                                        {{ $offer['currency'] ?? config('travelndc.currency', 'USD') }}
-                                        {{ number_format($offer['pricing']['components']['taxes'] ?? $offer['pricing']['tax_amount'] ?? 0, 2) }}
+                                        {{ $currency }} {{ number_format($taxes, 2) }}
                                     </span>
                                 </div>
-                                <div class="flex items-center justify-between text-emerald-700">
-                                    <span>Commission ({{ $offer['pricing']['commission']['percent_rate'] ?? $offer['pricing']['markup']['percent_rate'] ?? 0 }}%)</span>
+                                <div class="flex items-center justify-between {{ $adjustments >= 0 ? 'text-emerald-700' : 'text-rose-600' }}">
+                                    <span>Adjustments</span>
                                     <span class="font-semibold">
-                                        {{ number_format($offer['pricing']['commission']['commission_amount'] ?? $offer['pricing']['markup']['markup_amount'] ?? 0, 2) }}
+                                        {{ $adjustments >= 0 ? '+' : '' }}{{ number_format($adjustments, 2) }}
                                     </span>
                                 </div>
                                 <div class="flex items-center justify-between text-lg font-bold text-indigo-700">
                                     <span>Total Payable</span>
                                     <span>
-                                        {{ $offer['currency'] ?? config('travelndc.currency', 'USD') }}
-                                        {{ number_format($offer['pricing']['display_total'] ?? $offer['pricing']['payable_total'] ?? 0, 2) }}
+                                        {{ $currency }} {{ number_format($pricingData['payable_total'] ?? 0, 2) }}
                                     </span>
                                 </div>
-                                <div class="text-xs text-gray-400">
-                                    Commission source: {{ $offer['pricing']['commission']['source'] ?? $offer['pricing']['markup']['source'] ?? 'default' }}
-                                    ({{ $offer['pricing']['commission']['percent_rate'] ?? $offer['pricing']['markup']['percent_rate'] ?? 0 }}% of base fare)
+                                <div class="flex items-center justify-between text-xs text-gray-500">
+                                    <span>
+                                        @if ($engineUsed && $ruleCount > 0)
+                                            {{ $ruleCount }} {{ \Illuminate\Support\Str::plural('rule', $ruleCount) }} applied
+                                        @else
+                                            Legacy pricing applied
+                                        @endif
+                                    </span>
+                                    <span>
+                                        {{ $engineUsed ? 'Engine' : ($pricingData['legacy']['source'] ?? 'default') }}
+                                    </span>
                                 </div>
                             </div>
 

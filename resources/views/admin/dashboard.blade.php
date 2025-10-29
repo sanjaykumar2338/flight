@@ -5,16 +5,30 @@
         </h2>
     </x-slot>
 
-    <div class="py-6">
+@php
+    $usageOptions = [
+        \App\Models\PricingRule::USAGE_COMMISSION_BASE => 'Commission from base price',
+        \App\Models\PricingRule::USAGE_DISCOUNT_BASE => 'Discount from base price',
+        \App\Models\PricingRule::USAGE_DISCOUNT_TOTAL_PROMO => 'Discount from total price & promo code',
+        \App\Models\PricingRule::USAGE_COMMISSION_DISCOUNT_BASE => 'Commission with discount from base price',
+    ];
+    $travelTypes = ['OW' => 'One Way', 'RT' => 'Round Trip', 'OW+RT' => 'One Way & Round Trip'];
+@endphp
+
+<div class="py-6">
         <div class="mx-auto max-w-7xl space-y-8 sm:px-6 lg:px-8">
             <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                    <p class="text-sm font-medium text-gray-500">Airlines With Commission Rules</p>
-                    <p class="mt-2 text-3xl font-semibold text-gray-900">{{ $metrics['airlines_with_commissions'] }}</p>
+                    <p class="text-sm font-medium text-gray-500">Pricing Rules Active</p>
+                    <p class="mt-2 text-3xl font-semibold text-gray-900">{{ $metrics['active_rules'] }}</p>
                 </div>
                 <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                    <p class="text-sm font-medium text-gray-500">Active Commission Profiles</p>
-                    <p class="mt-2 text-3xl font-semibold text-gray-900">{{ $metrics['active_commissions'] }}</p>
+                    <p class="text-sm font-medium text-gray-500">Commissions &amp; Discounts</p>
+                    <p class="mt-2 text-lg font-semibold text-gray-900">C: {{ $metrics['commission_rules'] }} / D: {{ $metrics['discount_rules'] }}</p>
+                </div>
+                <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+                    <p class="text-sm font-medium text-gray-500">Carriers With Rules</p>
+                    <p class="mt-2 text-3xl font-semibold text-gray-900">{{ $metrics['carriers_with_rules'] }}</p>
                 </div>
                 <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
                     <p class="text-sm font-medium text-gray-500">Registered Users</p>
@@ -35,48 +49,74 @@
             </div>
 
             <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-                <h3 class="text-lg font-semibold text-gray-900">Recent Commission Updates</h3>
-                <p class="mt-1 text-sm text-gray-500">Latest airline commission settings for quick review.</p>
+                <h3 class="text-lg font-semibold text-gray-900">Recent Pricing Rule Updates</h3>
+                <p class="mt-1 text-sm text-gray-500">Latest adjustments across carriers and scopes.</p>
 
                 <div class="mt-4 overflow-x-auto">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">
                         <thead class="bg-gray-50">
                             <tr>
-                                <th class="px-4 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">Airline</th>
-                                <th class="px-4 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">Percent</th>
-                                <th class="px-4 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">Flat</th>
+                                <th class="px-4 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">Carrier</th>
+                                <th class="px-4 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">Scope</th>
+                                <th class="px-4 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">Usage</th>
                                 <th class="px-4 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">Active</th>
                                 <th class="px-4 py-2 text-left font-semibold uppercase tracking-wide text-gray-500">Updated</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-100 bg-white">
-                            @forelse ($recentCommissions as $commission)
+                            @forelse ($recentRules as $rule)
                                 <tr>
                                     <td class="px-4 py-2">
-                                        <div class="font-medium text-gray-900">{{ $commission->airline_code }}</div>
-                                        <div class="text-xs text-gray-500">{{ $commission->airline_name ?? '—' }}</div>
+                                        <div class="font-medium text-gray-900">{{ $rule->carrier }}</div>
+                                        <div class="text-xs text-gray-500">Priority {{ $rule->priority }}</div>
                                     </td>
-                                    <td class="px-4 py-2">{{ number_format($commission->markup_percent, 2) }}%</td>
-                                    <td class="px-4 py-2">{{ number_format($commission->flat_markup, 2) }}</td>
+                                    <td class="px-4 py-2 text-sm text-gray-700">
+                                        <div>{{ $rule->origin ?? 'ANY' }} → {{ $rule->destination ?? 'ANY' }} {{ $rule->both_ways ? '(Both ways)' : '' }}</div>
+                                        <div class="text-xs text-gray-500">{{ $travelTypes[$rule->travel_type] ?? $rule->travel_type ?? '—' }} · {{ $rule->cabin_class ?? '—' }}</div>
+                                    </td>
+                                    <td class="px-4 py-2 text-sm text-gray-700">
+                                        <div>{{ $usageOptions[$rule->usage] ?? \Illuminate\Support\Str::headline(str_replace('_', ' ', $rule->usage ?? '')) }}</div>
+                                        <div class="text-xs text-gray-500">
+                                            @php
+                                                $pieces = [];
+                                                if (!is_null($rule->percent)) {
+                                                    $pieces[] = number_format((float) $rule->percent, 2).'%' ;
+                                                }
+                                                if (!is_null($rule->flat_amount)) {
+                                                    $pieces[] = number_format((float) $rule->flat_amount, 2);
+                                                }
+                                                if (!is_null($rule->fee_percent)) {
+                                                    $pieces[] = number_format((float) $rule->fee_percent, 2).'%';
+                                                }
+                                                if (!is_null($rule->fixed_fee)) {
+                                                    $pieces[] = number_format((float) $rule->fixed_fee, 2);
+                                                }
+                                            @endphp
+                                            {{ implode(' · ', $pieces) ?: '—' }}
+                                        </div>
+                                    </td>
                                     <td class="px-4 py-2">
-                                        <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold {{ $commission->is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700' }}">
-                                            {{ $commission->is_active ? 'Active' : 'Disabled' }}
+                                        <span class="inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold {{ $rule->active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700' }}">
+                                            {{ $rule->active ? 'Active' : 'Disabled' }}
                                         </span>
                                     </td>
-                                    <td class="px-4 py-2 text-gray-500">{{ $commission->updated_at?->diffForHumans() ?? '—' }}</td>
+                                    <td class="px-4 py-2 text-gray-500">{{ $rule->updated_at?->diffForHumans() ?? '—' }}</td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="px-4 py-4 text-center text-gray-500">No commission data yet.</td>
+                                    <td colspan="5" class="px-4 py-4 text-center text-gray-500">No pricing rules yet.</td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
 
-                <div class="mt-4 text-right">
-                    <a href="{{ route('admin.airline-commissions.index') }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-500">
-                        Manage Airline Commissions →
+                <div class="mt-4 flex flex-col gap-2 text-right md:flex-row md:items-center md:justify-between">
+                    <a href="{{ route('admin.pricing.index') }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-500">
+                        Manage Pricing Rules →
+                    </a>
+                    <a href="{{ route('admin.airline-commissions.index') }}" class="text-xs font-semibold text-gray-500 hover:text-gray-700">
+                        Legacy commissions
                     </a>
                 </div>
             </div>
