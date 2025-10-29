@@ -18,6 +18,7 @@ class Booking extends Model
         'customer_email',
         'customer_name',
         'amount_base',
+        'commission_amount',
         'amount_final',
         'status',
         'paid_at',
@@ -34,6 +35,7 @@ class Booking extends Model
     protected $casts = [
         'paid_at' => 'datetime',
         'passenger_summary' => 'array',
+        'commission_amount' => 'float',
     ];
 
     public function user(): BelongsTo

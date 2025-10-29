@@ -6,7 +6,7 @@ use App\Models\AirlineCommission;
 
 class CommissionService
 {
-    public function pricingForAirline(string $airlineCode, float $baseAmount): array
+    public function pricingForAirline(string $airlineCode, float $baseFare): array
     {
         $airlineCode = strtoupper(trim($airlineCode));
 
@@ -15,20 +15,20 @@ class CommissionService
             ->first();
 
         $percent = $commission?->markup_percent ?? config('pricing.defaults.markup_percent', 0);
-        $flat = $commission?->flat_markup ?? config('pricing.defaults.flat_markup', 0);
 
-        $percentageMarkup = round($baseAmount * ($percent / 100), 2);
-        $markupTotal = round($percentageMarkup + $flat, 2);
-        $displayTotal = round($baseAmount + $markupTotal, 2);
+        $baseFare = round($baseFare, 2);
+        $commissionAmount = round($baseFare * ($percent / 100), 2);
+        $displayAmount = round($baseFare + $commissionAmount, 2);
 
         return [
             'airline_code' => $airlineCode,
-            'base_amount' => round($baseAmount, 2),
-            'markup_amount' => $markupTotal,
-            'percentage_component' => $percentageMarkup,
-            'flat_component' => round($flat, 2),
+            'base_amount' => $baseFare,
+            'commission_amount' => $commissionAmount,
+            'markup_amount' => $commissionAmount,
+            'percentage_component' => $commissionAmount,
+            'flat_component' => 0.0,
             'percent_rate' => (float) $percent,
-            'display_amount' => $displayTotal,
+            'display_amount' => $displayAmount,
             'source' => $commission?->exists ? 'airline' : 'default',
         ];
     }

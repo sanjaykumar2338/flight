@@ -133,7 +133,7 @@
             @if (!empty($pricedOffer) && $pricedBooking)
                 <div class="rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-800">
                     <div class="flex flex-col gap-4">
-                        <div class="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
                                 <p class="font-semibold">Latest Offer Pricing</p>
                                 <p class="text-sm">
@@ -141,9 +141,20 @@
                                     {{ $pricedOffer['currency'] }}
                                     {{ number_format($pricedOffer['pricing']['payable_total'], 2) }}
                                 </p>
+                                <p class="text-xs text-gray-700 md:max-w-sm">
+                                    Breakdown: Base {{ $pricedOffer['currency'] }}
+                                    {{ number_format($pricedOffer['pricing']['components']['base_fare'] ?? $pricedOffer['pricing']['ndc']['base_amount'] ?? 0, 2) }}
+                                    + Taxes {{ $pricedOffer['currency'] }}
+                                    {{ number_format($pricedOffer['pricing']['components']['taxes'] ?? $pricedOffer['pricing']['ndc']['tax_amount'] ?? 0, 2) }}
+                                    + Commission {{ $pricedOffer['currency'] }}
+                                    {{ number_format($pricedOffer['pricing']['components']['commission'] ?? $pricedOffer['pricing']['commission']['commission_amount'] ?? 0, 2) }}
+                                    = {{ $pricedOffer['currency'] }}
+                                    {{ number_format($pricedOffer['pricing']['payable_total'], 2) }}
+                                </p>
                             </div>
                             <div class="rounded bg-emerald-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-900">
-                                Markup Applied: {{ number_format($pricedOffer['pricing']['markup']['markup_amount'], 2) }}
+                                Commission ({{ $pricedOffer['pricing']['commission']['percent_rate'] ?? $pricedOffer['pricing']['markup']['percent_rate'] ?? 0 }}%):
+                                {{ number_format($pricedOffer['pricing']['commission']['commission_amount'] ?? $pricedOffer['pricing']['markup']['markup_amount'] ?? 0, 2) }}
                             </div>
                         </div>
 
@@ -249,29 +260,35 @@
 
                             <div class="mt-4 space-y-3 border-t border-gray-100 pt-4 text-sm">
                                 <div class="flex items-center justify-between">
-                                    <span class="text-gray-500">Base + Taxes</span>
+                                    <span class="text-gray-500">Base Fare</span>
                                     <span class="font-semibold text-gray-900">
                                         {{ $offer['currency'] ?? config('travelndc.currency', 'USD') }}
-                                        {{ number_format($offer['pricing']['total_amount'] ?? 0, 2) }}
+                                        {{ number_format($offer['pricing']['components']['base_fare'] ?? $offer['pricing']['base_amount'] ?? 0, 2) }}
+                                    </span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-gray-500">Taxes</span>
+                                    <span class="font-semibold text-gray-900">
+                                        {{ $offer['currency'] ?? config('travelndc.currency', 'USD') }}
+                                        {{ number_format($offer['pricing']['components']['taxes'] ?? $offer['pricing']['tax_amount'] ?? 0, 2) }}
                                     </span>
                                 </div>
                                 <div class="flex items-center justify-between text-emerald-700">
-                                    <span>Markup</span>
+                                    <span>Commission ({{ $offer['pricing']['commission']['percent_rate'] ?? $offer['pricing']['markup']['percent_rate'] ?? 0 }}%)</span>
                                     <span class="font-semibold">
-                                        {{ number_format($offer['pricing']['markup']['markup_amount'] ?? 0, 2) }}
+                                        {{ number_format($offer['pricing']['commission']['commission_amount'] ?? $offer['pricing']['markup']['markup_amount'] ?? 0, 2) }}
                                     </span>
                                 </div>
                                 <div class="flex items-center justify-between text-lg font-bold text-indigo-700">
                                     <span>Total Payable</span>
                                     <span>
                                         {{ $offer['currency'] ?? config('travelndc.currency', 'USD') }}
-                                        {{ number_format($offer['pricing']['display_total'] ?? 0, 2) }}
+                                        {{ number_format($offer['pricing']['display_total'] ?? $offer['pricing']['payable_total'] ?? 0, 2) }}
                                     </span>
                                 </div>
                                 <div class="text-xs text-gray-400">
-                                    Commission source: {{ $offer['pricing']['markup']['source'] ?? 'default' }}
-                                    ({{ $offer['pricing']['markup']['percent_rate'] ?? 0 }}% +
-                                    {{ number_format($offer['pricing']['markup']['flat_component'] ?? 0, 2) }})
+                                    Commission source: {{ $offer['pricing']['commission']['source'] ?? $offer['pricing']['markup']['source'] ?? 'default' }}
+                                    ({{ $offer['pricing']['commission']['percent_rate'] ?? $offer['pricing']['markup']['percent_rate'] ?? 0 }}% of base fare)
                                 </div>
                             </div>
 

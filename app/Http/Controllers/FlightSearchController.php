@@ -55,17 +55,28 @@ class FlightSearchController extends Controller
                     ->map(function (array $offer) {
                         $pricing = Arr::get($offer, 'pricing', []);
                         $carrier = trim((string) Arr::get($offer, 'primary_carrier', Arr::get($offer, 'owner', '')));
-
-                        $totals = $this->commissionService->pricingForAirline(
-                            $carrier,
-                            (float) ($pricing['total_amount'] ?? $pricing['base_amount'] ?? 0)
+                        $baseAmount = round((float) ($pricing['base_amount'] ?? 0), 2);
+                        $taxAmount = round(
+                            (float) ($pricing['tax_amount'] ?? (($pricing['total_amount'] ?? 0) - $baseAmount)),
+                            2
                         );
+                        $taxAmount = $taxAmount < 0 ? 0.0 : $taxAmount;
 
-                        $offer['pricing']['base_amount'] = round((float) ($pricing['base_amount'] ?? 0), 2);
-                        $offer['pricing']['tax_amount'] = round((float) ($pricing['tax_amount'] ?? 0), 2);
-                        $offer['pricing']['total_amount'] = round((float) ($pricing['total_amount'] ?? 0), 2);
-                        $offer['pricing']['markup'] = $totals;
-                        $offer['pricing']['display_total'] = $totals['display_amount'];
+                        $commissionBreakdown = $this->commissionService->pricingForAirline($carrier, $baseAmount);
+                        $payableTotal = round($baseAmount + $taxAmount + $commissionBreakdown['commission_amount'], 2);
+
+                        $offer['pricing']['base_amount'] = $baseAmount;
+                        $offer['pricing']['tax_amount'] = $taxAmount;
+                        $offer['pricing']['total_amount'] = round((float) ($pricing['total_amount'] ?? $baseAmount + $taxAmount), 2);
+                        $offer['pricing']['commission'] = $commissionBreakdown;
+                        $offer['pricing']['markup'] = $commissionBreakdown;
+                        $offer['pricing']['components'] = [
+                            'base_fare' => $baseAmount,
+                            'taxes' => $taxAmount,
+                            'commission' => $commissionBreakdown['commission_amount'],
+                        ];
+                        $offer['pricing']['payable_total'] = $payableTotal;
+                        $offer['pricing']['display_total'] = $payableTotal;
 
                         return $offer;
                     })

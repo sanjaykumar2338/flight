@@ -35,19 +35,31 @@ class OfferPricingController extends Controller
         $ndcPricing = Arr::get($pricedOffer, 'pricing', []);
 
         $carrier = trim((string) Arr::get($payload, 'primary_carrier', Arr::get($payload, 'owner', '')));
-        $totals = $this->commissionService->pricingForAirline(
-            $carrier,
-            (float) ($ndcPricing['total_amount'] ?? $ndcPricing['base_amount'] ?? 0)
+        $baseAmount = round((float) ($ndcPricing['base_amount'] ?? 0), 2);
+        $taxAmount = round(
+            (float) ($ndcPricing['tax_amount'] ?? (($ndcPricing['total_amount'] ?? 0) - $baseAmount)),
+            2
         );
+        $taxAmount = $taxAmount < 0 ? 0.0 : $taxAmount;
+
+        $commissionBreakdown = $this->commissionService->pricingForAirline($carrier, $baseAmount);
+        $payableTotal = round($baseAmount + $taxAmount + $commissionBreakdown['commission_amount'], 2);
 
         $pricing = [
             'ndc' => [
-                'base_amount' => round((float) ($ndcPricing['base_amount'] ?? 0), 2),
-                'tax_amount' => round((float) ($ndcPricing['tax_amount'] ?? 0), 2),
-                'total_amount' => round((float) ($ndcPricing['total_amount'] ?? 0), 2),
+                'base_amount' => $baseAmount,
+                'tax_amount' => $taxAmount,
+                'total_amount' => round((float) ($ndcPricing['total_amount'] ?? ($baseAmount + $taxAmount)), 2),
             ],
-            'markup' => $totals,
-            'payable_total' => $totals['display_amount'],
+            'commission' => $commissionBreakdown,
+            'markup' => $commissionBreakdown,
+            'components' => [
+                'base_fare' => $baseAmount,
+                'taxes' => $taxAmount,
+                'commission' => $commissionBreakdown['commission_amount'],
+            ],
+            'payable_total' => $payableTotal,
+            'display_total' => $payableTotal,
         ];
 
         $booking = Booking::create([
@@ -58,6 +70,7 @@ class OfferPricingController extends Controller
             'customer_email' => Auth::user()?->email,
             'customer_name' => Auth::user()?->name,
             'amount_base' => $pricing['ndc']['base_amount'],
+            'commission_amount' => $commissionBreakdown['commission_amount'],
             'amount_final' => $pricing['payable_total'],
             'status' => 'pending',
             'priced_offer_ref' => Arr::get($payload, 'offer_id'),

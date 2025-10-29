@@ -21,6 +21,9 @@ it('normalizes airline codes before looking up commissions', function () {
     expect($result)
         ->airline_code->toBe('SQ')
         ->percent_rate->toBe(10.0)
-        ->markup_amount->toBe(25.0)
+        ->markup_amount->toBe(20.0)
+        ->commission_amount->toBe(20.0)
+        ->flat_component->toBe(0.0)
+        ->display_amount->toBe(220.0)
         ->source->toBe('airline');
 });
