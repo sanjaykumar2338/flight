@@ -39,14 +39,14 @@
                         <button
                             type="button"
                             data-trip-type="return"
-                            class="trip-type-btn rounded-full px-5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'return' ? 'bg-sky-600 text-white shadow-md border border-sky-600' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
+                            class="trip-type-btn rounded-full px-5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'return' ? 'bg-black text-white shadow-md border border-black' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
                         >
                             Return
                         </button>
                         <button
                             type="button"
                             data-trip-type="one_way"
-                            class="trip-type-btn rounded-full px-5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'one_way' ? 'bg-sky-600 text-white shadow-md border border-sky-600' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
+                            class="trip-type-btn rounded-full px-5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'one_way' ? 'bg-black text-white shadow-md border border-black' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
                         >
                             One-way
                         </button>
@@ -495,7 +495,7 @@
 
                     tripTypeButtons.forEach((button) => {
                         const isActive = button.dataset.tripType === value;
-                        const activeClasses = ['bg-sky-600', 'text-white', 'shadow-md', 'border', 'border-sky-600'];
+                        const activeClasses = ['bg-black', 'text-white', 'shadow-md', 'border', 'border-black'];
                         const inactiveClasses = ['bg-white', 'text-slate-600', 'border', 'border-transparent', 'hover:text-slate-900', 'hover:bg-slate-50'];
 
                         if (button.disabled) {
