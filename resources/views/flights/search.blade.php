@@ -35,17 +35,17 @@
                         </h3>
                     </div>
 
-                    <div class="inline-flex rounded-full bg-slate-100 p-1 text-sm font-semibold text-slate-600 shadow-inner">
+                    <div class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 p-1 text-sm font-semibold text-slate-600 shadow-sm">
                         <button type="button" data-trip-type="return"
-                            class="trip-type-btn rounded-full px-4 py-1.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+                            class="trip-type-btn rounded-full border border-transparent px-5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2">
                             Return
                         </button>
                         <button type="button" data-trip-type="one_way"
-                            class="trip-type-btn rounded-full px-4 py-1.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+                            class="trip-type-btn rounded-full border border-transparent px-5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2">
                             One-way
                         </button>
                         <button type="button" data-trip-type="multi_city" disabled
-                            class="trip-type-btn rounded-full px-4 py-1.5 text-slate-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed"
+                            class="trip-type-btn rounded-full border border-transparent px-5 py-2 text-slate-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
                             title="Multi-city search is coming soon">
                             Multi-city
                         </button>
@@ -486,9 +486,21 @@
 
                     tripTypeButtons.forEach((button) => {
                         const isActive = button.dataset.tripType === value;
-                        button.classList.toggle('bg-white', isActive);
-                        button.classList.toggle('text-sky-600', isActive);
-                        button.classList.toggle('shadow', isActive);
+
+                        if (isActive) {
+                            button.classList.add('bg-sky-600', 'text-white', 'shadow-md', 'border-sky-600');
+                            button.classList.remove('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-50', 'border-transparent');
+                        } else {
+                            if (button.disabled) {
+                                button.classList.add('text-slate-400', 'border-transparent');
+                                button.classList.remove('bg-sky-600', 'text-white', 'shadow-md', 'border-sky-600', 'hover:text-slate-900', 'hover:bg-slate-50');
+                                return;
+                            }
+
+                            button.classList.remove('bg-sky-600', 'text-white', 'shadow-md', 'border-sky-600');
+                            button.classList.add('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-50', 'border-transparent');
+                            button.classList.remove('text-slate-400');
+                        }
                     });
 
                     if (returnWrapper && returnInput) {

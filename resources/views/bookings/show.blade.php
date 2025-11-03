@@ -84,7 +84,7 @@
                         <p class="mt-2 text-sm font-semibold text-slate-900">
                             {{ $booking->paid_at?->toDayDateTimeString() ?? 'Pending' }}
                         </p>
-                        <p class="mt-1 text-xs text-slate-500">
+                        <p class="mt-1 text-xs text-slate-500 break-all">
                             Reference: {{ $booking->payment_reference ?? $latestTransaction?->reference ?? '—' }}
                         </p>
                     </div>
