@@ -113,6 +113,7 @@ class OfferPricingController extends Controller
                 'id' => $booking->id,
                 'status' => $booking->status,
             ],
+            'scrollTo' => 'payment-options',
         ]);
     }
 

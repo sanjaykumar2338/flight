@@ -4,6 +4,7 @@ namespace App\Listeners;
 
 use App\Events\BookingPaid;
 use App\Mail\BookingPaidMail;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
 class SendBookingPaidEmail
@@ -16,6 +17,14 @@ class SendBookingPaidEmail
             return;
         }
 
-        Mail::to($email)->send(new BookingPaidMail($event->booking));
+        try {
+            Mail::to($email)->send(new BookingPaidMail($event->booking));
+        } catch (\Throwable $throwable) {
+            Log::warning('Failed to send booking paid email', [
+                'booking_id' => $event->booking->id,
+                'email' => $email,
+                'message' => $throwable->getMessage(),
+            ]);
+        }
     }
 }

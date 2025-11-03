@@ -13,6 +13,8 @@ use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Payments\PaystackCallbackController;
 use App\Http\Controllers\Payments\PaystackCheckoutController;
 use App\Http\Controllers\Payments\PaystackWebhookController;
+use App\Http\Controllers\Payments\StripeController;
+use App\Http\Controllers\Webhooks\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -30,6 +32,8 @@ Route::get('/', [FlightSearchController::class, 'index'])->name('flights.search'
 Route::post('/offers/price', OfferPricingController::class)->name('offers.price');
 Route::post('/checkout/paystack', PaystackCheckoutController::class)->name('checkout.paystack');
 Route::get('/bookings/{booking}/payment/callback', PaystackCallbackController::class)->name('bookings.paystack.callback');
+Route::post('/payments/stripe/checkout/{booking}', [StripeController::class, 'checkout'])->name('payments.stripe.checkout');
+Route::get('/payments/stripe/success', [StripeController::class, 'success'])->name('payments.stripe.success');
 
 Route::get('/bookings/{booking}/demo', [BookingDemoController::class, 'show'])->name('bookings.demo');
 Route::post('/bookings/{booking}/demo/{status}', [BookingDemoController::class, 'simulate'])->name('bookings.demo.simulate');
@@ -60,5 +64,6 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.'
 });
 
 Route::post('/webhooks/paystack', PaystackWebhookController::class)->name('webhooks.paystack');
+Route::post('/webhooks/stripe', [StripeWebhookController::class, 'handle'])->name('webhooks.stripe');
 
 require __DIR__.'/auth.php';

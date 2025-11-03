@@ -33,10 +33,19 @@ class BookingController extends Controller
 
         $booking->load(['transactions' => fn ($query) => $query->latest()]);
 
+        $transactions = $booking->transactions;
+        $latestTransaction = $transactions->first();
+
+        if ($latestTransaction) {
+            $transactions = $transactions->filter(
+                fn ($transaction) => $transaction->provider === $latestTransaction->provider
+            )->values();
+        }
+
         return view('bookings.show', [
             'booking' => $booking,
-            'transactions' => $booking->transactions,
-            'latestTransaction' => $booking->transactions->first(),
+            'transactions' => $transactions,
+            'latestTransaction' => $latestTransaction,
             'isDemo' => strcasecmp(config('paystack.mode', 'sandbox'), 'demo') === 0,
         ]);
     }

@@ -100,6 +100,7 @@ class FlightSearchController extends Controller
         $pricedBookingId = session()->pull('bookingId');
         $bookingCreated = session()->pull('bookingCreated');
         $pricedBooking = $pricedBookingId ? Booking::find($pricedBookingId) : null;
+        $scrollTo = session()->pull('scrollTo');
 
         return view('flights.search', [
             'searchPerformed' => $request->hasSearchCriteria(),
@@ -121,6 +122,7 @@ class FlightSearchController extends Controller
             'pricedOffer' => $pricedOffer,
             'pricedBooking' => $pricedBooking,
             'bookingCreated' => $bookingCreated,
+            'scrollTo' => $scrollTo,
         ]);
     }
 

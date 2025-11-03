@@ -9,6 +9,8 @@
     $badgeClass = $statusClasses[$status] ?? 'bg-gray-100 text-gray-700';
     $pricing = json_decode($booking->pricing_json ?? '[]', true) ?: [];
     $itinerary = json_decode($booking->itinerary_json ?? '[]', true) ?: [];
+    $displayCurrency = $latestTransaction?->currency ?? $booking->currency;
+    $displayAmount = (float) ($latestTransaction?->amount ?? $booking->amount_final ?? 0);
 @endphp
 
 <x-app-layout>
@@ -45,7 +47,7 @@
                             </div>
                             <div>
                                 <dt class="font-medium text-gray-500">Total Amount</dt>
-                                <dd>{{ $booking->currency }} {{ number_format((float) ($booking->amount_final ?? 0), 2) }}</dd>
+                                <dd>{{ $displayCurrency }} {{ number_format($displayAmount, 2) }}</dd>
                             </div>
                             <div>
                                 <dt class="font-medium text-gray-500">Customer</dt>
@@ -61,12 +63,12 @@
                             </div>
                         </dl>
                     </div>
-
+                   
                     @if ($status !== 'paid')
                         <div class="rounded-lg border border-indigo-200 bg-white p-6 shadow-sm">
                             <h3 class="text-lg font-semibold text-gray-900">Complete Your Payment</h3>
                             <p class="mt-2 text-sm text-gray-600">
-                                Submit your details to continue with Paystack.
+                                Provide your contact details and choose a payment method to continue.
                             </p>
 
                             <form method="POST" action="{{ route('checkout.paystack') }}" class="mt-4 space-y-4">
@@ -83,9 +85,19 @@
                                         value="{{ old('email', $booking->customer_email ?? auth()->user()->email ?? '') }}" required />
                                     <x-input-error :messages="$errors->get('email')" class="mt-2" />
                                 </div>
-                                <div class="flex items-center gap-3">
+                                <div class="flex flex-wrap items-center gap-3">
                                     <x-primary-button>{{ __('Pay with Paystack') }}</x-primary-button>
+                                    <button
+                                        type="button"
+                                        data-stripe-url="{{ route('payments.stripe.checkout', $booking) }}"
+                                        class="rounded-md border border-indigo-600 bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                        data-stripe-button
+                                        data-loading-text="{{ __('Redirecting...') }}"
+                                    >
+                                        {{ __('Pay with Stripe') }}
+                                    </button>
                                     <x-input-error :messages="$errors->get('checkout')" />
+                                    <p data-stripe-error class="text-sm text-red-600"></p>
                                 </div>
                             </form>
                         </div>
@@ -161,4 +173,8 @@
             </div>
         </div>
     </div>
+
+    @push('scripts')
+        @include('payments.partials.stripe-checkout-script')
+    @endpush
 </x-app-layout>

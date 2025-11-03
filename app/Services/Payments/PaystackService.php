@@ -29,10 +29,16 @@ class PaystackService
         $this->config = $config ?? config('paystack', []);
         $this->mode = (string) ($this->config['mode'] ?? 'sandbox');
 
-        $this->client = $client ?? new Client([
-            'base_uri' => rtrim((string) ($this->config['payment_url'] ?? 'https://api.paystack.co'), '/') . '/',
-            'timeout' => 30,
-        ]);
+        $baseUri = rtrim((string) ($this->config['payment_url'] ?? 'https://api.paystack.co'), '/') . '/';
+
+        if ($client && $client->getConfig('base_uri')) {
+            $this->client = $client;
+        } else {
+            $this->client = new Client([
+                'base_uri' => $baseUri,
+                'timeout' => 30,
+            ]);
+        }
 
         $this->logger = $logger ?? LogFacade::channel(config('logging.default'));
     }
@@ -49,10 +55,12 @@ class PaystackService
             return $this->fakeInitialization($booking, $reference);
         }
 
+        $currency = strtoupper((string) ($this->config['currency'] ?? 'NGN'));
+
         $payload = [
             'email' => $email,
             'amount' => $this->formatAmountForPaystack($booking->amount_final ?: 0),
-            'currency' => $booking->currency ?: ($this->config['currency'] ?? 'NGN'),
+            'currency' => $currency,
             'reference' => $reference,
             'metadata' => array_merge($metadata, [
                 'booking_id' => $booking->id,
@@ -60,6 +68,14 @@ class PaystackService
                 'mode' => $this->mode,
             ]),
         ];
+
+        $this->logger->info('Paystack checkout payload prepared', [
+            'booking_id' => $booking->id,
+            'reference' => $reference,
+            'currency' => $currency,
+            'amount_minor' => $payload['amount'],
+            'mode' => $this->mode,
+        ]);
 
         if (!empty($metadata['callback_url'])) {
             $payload['callback_url'] = $metadata['callback_url'];
@@ -106,6 +122,51 @@ class PaystackService
             'reference' => $reference,
             'access_code' => $data['access_code'] ?? null,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function verifyTransaction(string $reference): array
+    {
+        $reference = trim($reference);
+
+        if ($reference === '') {
+            throw new PaystackException('Paystack reference is required for verification.');
+        }
+
+        if ($this->isDemoMode()) {
+            return [
+                'reference' => $reference,
+                'status' => 'success',
+            ];
+        }
+
+        try {
+            $response = $this->client->get('transaction/verify/' . urlencode($reference), [
+                'headers' => [
+                    'Authorization' => 'Bearer ' . $this->secretKey(),
+                    'Accept' => 'application/json',
+                ],
+            ]);
+        } catch (GuzzleException $exception) {
+            throw new PaystackException('Unable to verify Paystack transaction: ' . $exception->getMessage(), previous: $exception);
+        }
+
+        $decoded = json_decode((string) $response->getBody(), true);
+
+        if (!is_array($decoded) || !Arr::get($decoded, 'status')) {
+            $message = Arr::get($decoded, 'message', 'Unknown Paystack verification error');
+
+            $this->logger->warning('Paystack verification failed', [
+                'reference' => $reference,
+                'response' => $decoded,
+            ]);
+
+            throw new PaystackException('Paystack verification failed: ' . $message);
+        }
+
+        return Arr::get($decoded, 'data', []);
     }
 
     /**

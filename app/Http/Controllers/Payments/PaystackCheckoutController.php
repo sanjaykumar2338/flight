@@ -34,6 +34,7 @@ class PaystackCheckoutController extends Controller
 
         $reference = 'PSK-' . Str::upper(Str::random(16));
         $mode = config('paystack.mode', 'sandbox');
+        $currency = strtoupper(config('paystack.currency', 'NGN'));
 
         $metadata = [
             'reference' => $reference,
@@ -49,8 +50,14 @@ class PaystackCheckoutController extends Controller
                 'message' => $exception->getMessage(),
             ]);
 
+            $message = 'Unable to start Paystack checkout. Please try again later.';
+
+            if (config('app.debug')) {
+                $message .= ' [' . $exception->getMessage() . ']';
+            }
+
             return back()->withErrors([
-                'checkout' => 'Unable to start Paystack checkout. Please try again later.',
+                'checkout' => $message,
             ]);
         }
 
@@ -60,14 +67,14 @@ class PaystackCheckoutController extends Controller
             'mode' => $mode,
             'reference' => $response['reference'],
             'amount' => $booking->amount_final,
-            'currency' => $booking->currency ?? config('paystack.currency', 'NGN'),
+            'currency' => $currency,
             'status' => 'init',
             'raw_payload' => json_encode([
                 'mode' => $mode,
                 'request' => [
                     'email' => $booking->customer_email,
                     'amount' => $booking->amount_final,
-                    'currency' => $booking->currency,
+                    'currency' => $currency,
                     'reference' => $response['reference'],
                 ],
                 'response' => $response,

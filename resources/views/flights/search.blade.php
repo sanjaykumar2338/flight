@@ -1,6 +1,12 @@
 @php
     $search = $searchParams ?? [];
     $selectedAirlines = $selectedAirlines ?? [];
+    $tripType = old('trip_type', $search['trip_type'] ?? ($search['return_date'] ? 'return' : 'one_way'));
+    $tripType = in_array($tripType, ['return', 'one_way', 'multi_city'], true) ? $tripType : 'return';
+    if ($tripType === 'multi_city') {
+        $tripType = 'return';
+    }
+    $scrollTarget = $scrollTo ?? null;
 @endphp
 
 <x-app-layout>
@@ -18,40 +24,74 @@
                 </div>
             @endif
 
-            <div class="bg-white p-6 shadow sm:rounded-lg">
-                <form method="GET" action="{{ route('flights.search') }}" class="space-y-6">
-                    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <div class="bg-white p-6 shadow-sm sm:rounded-3xl md:p-8">
+                <form method="GET" action="{{ route('flights.search') }}" class="space-y-6" id="flight-search-form">
+                    <input type="hidden" name="trip_type" id="trip_type_input" value="{{ $tripType }}">
+
+                    <div class="space-y-1">
+                        <p class="text-sm font-semibold text-sky-600">Hello there,</p>
+                        <h3 class="text-2xl font-semibold leading-tight text-gray-900">
+                            Book cheap flights with your one-stop travel shop!
+                        </h3>
+                    </div>
+
+                    <div class="inline-flex rounded-full bg-slate-100 p-1 text-sm font-semibold text-slate-600 shadow-inner">
+                        <button type="button" data-trip-type="return"
+                            class="trip-type-btn rounded-full px-4 py-1.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+                            Return
+                        </button>
+                        <button type="button" data-trip-type="one_way"
+                            class="trip-type-btn rounded-full px-4 py-1.5 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+                            One-way
+                        </button>
+                        <button type="button" data-trip-type="multi_city" disabled
+                            class="trip-type-btn rounded-full px-4 py-1.5 text-slate-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 disabled:cursor-not-allowed"
+                            title="Multi-city search is coming soon">
+                            Multi-city
+                        </button>
+                    </div>
+
+                    <div class="grid gap-4 md:grid-cols-[1fr_auto_1fr]">
                         <div>
-                            <x-input-label for="origin" value="Origin (IATA)" />
+                            <x-input-label for="origin" value="From" />
                             <x-text-input id="origin" name="origin" type="text" maxlength="3" class="mt-1 block w-full uppercase"
-                                value="{{ old('origin', $search['origin'] ?? '') }}" />
+                                placeholder="e.g. SIN" value="{{ old('origin', $search['origin'] ?? '') }}" />
                             <x-input-error :messages="$errors->get('origin')" class="mt-2" />
                         </div>
-
+                        <div class="flex items-end justify-center pb-1 md:pb-0">
+                            <button type="button" id="swap_routes"
+                                class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:text-sky-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
+                                &#8646;
+                            </button>
+                        </div>
                         <div>
-                            <x-input-label for="destination" value="Destination (IATA)" />
+                            <x-input-label for="destination" value="To" />
                             <x-text-input id="destination" name="destination" type="text" maxlength="3" class="mt-1 block w-full uppercase"
-                                value="{{ old('destination', $search['destination'] ?? '') }}" />
+                                placeholder="e.g. LHR" value="{{ old('destination', $search['destination'] ?? '') }}" />
                             <x-input-error :messages="$errors->get('destination')" class="mt-2" />
                         </div>
+                    </div>
 
+                    <div class="grid gap-4 md:grid-cols-2">
                         <div>
-                            <x-input-label for="departure_date" value="Departure Date" />
+                            <x-input-label for="departure_date" value="Departure" />
                             <x-text-input id="departure_date" name="departure_date" type="date" class="mt-1 block w-full"
                                 value="{{ old('departure_date', $search['departure_date'] ?? '') }}" />
                             <x-input-error :messages="$errors->get('departure_date')" class="mt-2" />
                         </div>
-
-                        <div>
-                            <x-input-label for="return_date" value="Return Date (optional)" />
+                        <div id="return_date_wrapper">
+                            <x-input-label for="return_date" value="Return" />
                             <x-text-input id="return_date" name="return_date" type="date" class="mt-1 block w-full"
                                 value="{{ old('return_date', $search['return_date'] ?? '') }}" />
                             <x-input-error :messages="$errors->get('return_date')" class="mt-2" />
                         </div>
+                    </div>
 
+                    <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <x-input-label for="cabin_class" value="Cabin Class" />
-                            <select id="cabin_class" name="cabin_class" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <select id="cabin_class" name="cabin_class"
+                                class="mt-1 block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                 @foreach (['ECONOMY' => 'Economy', 'PREMIUM_ECONOMY' => 'Premium Economy', 'BUSINESS' => 'Business', 'FIRST' => 'First'] as $value => $label)
                                     <option value="{{ $value }}" @selected(($search['cabin_class'] ?? 'ECONOMY') === $value)>
                                         {{ $label }}
@@ -60,33 +100,39 @@
                             </select>
                             <x-input-error :messages="$errors->get('cabin_class')" class="mt-2" />
                         </div>
-
-                        <div class="grid grid-cols-3 gap-4">
-                            <div>
-                                <x-input-label for="adults" value="Adults" />
-                                <x-text-input id="adults" name="adults" type="number" min="1" max="9" class="mt-1 block w-full"
-                                    value="{{ old('adults', $search['adults'] ?? 1) }}" />
-                                <x-input-error :messages="$errors->get('adults')" class="mt-2" />
-                            </div>
-                            <div>
-                                <x-input-label for="children" value="Children" />
-                                <x-text-input id="children" name="children" type="number" min="0" max="9" class="mt-1 block w-full"
-                                    value="{{ old('children', $search['children'] ?? 0) }}" />
-                                <x-input-error :messages="$errors->get('children')" class="mt-2" />
-                            </div>
-                            <div>
-                                <x-input-label for="infants" value="Infants" />
-                                <x-text-input id="infants" name="infants" type="number" min="0" max="9" class="mt-1 block w-full"
-                                    value="{{ old('infants', $search['infants'] ?? 0) }}" />
-                                <x-input-error :messages="$errors->get('infants')" class="mt-2" />
+                        <div>
+                            <span class="text-sm font-semibold text-slate-700">Travellers</span>
+                            <div class="mt-2 grid grid-cols-3 gap-3">
+                                <div>
+                                    <x-input-label for="adults" value="Adults" class="text-xs text-slate-500" />
+                                    <x-text-input id="adults" name="adults" type="number" min="1" max="9"
+                                        class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                        value="{{ old('adults', $search['adults'] ?? 1) }}" />
+                                    <x-input-error :messages="$errors->get('adults')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <x-input-label for="children" value="Children" class="text-xs text-slate-500" />
+                                    <x-text-input id="children" name="children" type="number" min="0" max="9"
+                                        class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                        value="{{ old('children', $search['children'] ?? 0) }}" />
+                                    <x-input-error :messages="$errors->get('children')" class="mt-2" />
+                                </div>
+                                <div>
+                                    <x-input-label for="infants" value="Infants" class="text-xs text-slate-500" />
+                                    <x-text-input id="infants" name="infants" type="number" min="0" max="9"
+                                        class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                        value="{{ old('infants', $search['infants'] ?? 0) }}" />
+                                    <x-input-error :messages="$errors->get('infants')" class="mt-2" />
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <x-input-label for="flexible_days" value="Flexible (+/- days)" />
-                            <select id="flexible_days" name="flexible_days" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <select id="flexible_days" name="flexible_days"
+                                class="mt-1 block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                 @foreach ([0, 1, 2, 3] as $days)
                                     <option value="{{ $days }}" @selected(($search['flexible_days'] ?? 0) == $days)>
                                         {{ $days === 0 ? 'Exact date only' : '+/- ' . $days . ' day(s)' }}
@@ -97,17 +143,17 @@
 
                         <div>
                             <x-input-label for="selected_airlines" value="Preferred Airlines" />
-                            <x-text-input id="selected_airlines" name="selected_airlines" type="text" class="mt-1 block w-full"
+                            <x-text-input id="selected_airlines" name="selected_airlines" type="text" class="mt-1 block w-full rounded-lg border-slate-200 focus:border-sky-500 focus:ring-sky-500"
                                 value="{{ old('selected_airlines', implode(',', $selectedAirlines)) }}" placeholder="e.g. SQ, EK" />
                             <p class="mt-1 text-xs text-gray-500">Comma separated airline codes.</p>
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between">
-                        <div class="flex gap-2">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex flex-wrap gap-2">
                             @if (!empty($selectedAirlines))
                                 @foreach ($selectedAirlines as $airline)
-                                    <span class="rounded-full bg-indigo-100 px-3 py-1 text-xs font-medium text-indigo-700">
+                                    <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
                                         {{ $airline }}
                                     </span>
                                 @endforeach
@@ -143,7 +189,7 @@
                     $engineUsed = data_get($pricing, 'engine.used', false);
                     $legacySource = data_get($pricing, 'legacy.source');
                 @endphp
-                <div class="rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+                <div id="payment-options" class="rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
                     <div class="flex flex-col gap-4">
                         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                             <div>
@@ -264,7 +310,17 @@
                             </div>
                             <div class="flex items-center gap-3">
                                 <x-primary-button>{{ __('Pay with Paystack') }}</x-primary-button>
+                                <button
+                                    type="button"
+                                    data-stripe-url="{{ route('payments.stripe.checkout', $pricedBooking) }}"
+                                    class="rounded-md border border-indigo-600 bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+                                    data-stripe-button
+                                    data-loading-text="{{ __('Redirecting...') }}"
+                                >
+                                    {{ __('Pay with Stripe') }}
+                                </button>
                                 <x-input-error :messages="$errors->get('checkout')" />
+                                <p data-stripe-error class="text-sm text-red-600"></p>
                             </div>
                         </form>
                     </div>
@@ -407,4 +463,91 @@
             @endif
         </div>
     </div>
+
+    @push('scripts')
+        <script>
+            const scrollTargetId = @json($scrollTarget);
+
+            document.addEventListener('DOMContentLoaded', () => {
+                const tripTypeInput = document.getElementById('trip_type_input');
+                const tripTypeButtons = document.querySelectorAll('.trip-type-btn');
+                const returnWrapper = document.getElementById('return_date_wrapper');
+                const returnInput = document.getElementById('return_date');
+                const swapRoutesButton = document.getElementById('swap_routes');
+                const originInput = document.getElementById('origin');
+                const destinationInput = document.getElementById('destination');
+
+                const setActiveTripType = (value) => {
+                    if (!tripTypeInput) {
+                        return;
+                    }
+
+                    tripTypeInput.value = value;
+
+                    tripTypeButtons.forEach((button) => {
+                        const isActive = button.dataset.tripType === value;
+                        button.classList.toggle('bg-white', isActive);
+                        button.classList.toggle('text-sky-600', isActive);
+                        button.classList.toggle('shadow', isActive);
+                    });
+
+                    if (returnWrapper && returnInput) {
+                        const hideReturn = value === 'one_way';
+                        returnWrapper.classList.toggle('hidden', hideReturn);
+                        returnInput.disabled = hideReturn;
+                        if (hideReturn) {
+                            returnInput.value = '';
+                        }
+                    }
+                };
+
+                const initialTripType = tripTypeInput ? tripTypeInput.value : 'return';
+                setActiveTripType(initialTripType || 'return');
+
+                tripTypeButtons.forEach((button) => {
+                    if (button.disabled) {
+                        return;
+                    }
+
+                    button.addEventListener('click', () => {
+                        const tripType = button.dataset.tripType || 'return';
+                        setActiveTripType(tripType);
+                    });
+                });
+
+                if (swapRoutesButton && originInput && destinationInput) {
+                    swapRoutesButton.addEventListener('click', () => {
+                        const originalValue = originInput.value;
+                        originInput.value = destinationInput.value;
+                        destinationInput.value = originalValue;
+                        originInput.focus();
+                    });
+                }
+
+                const searchForm = document.getElementById('flight-search-form');
+                if (searchForm) {
+                    searchForm.addEventListener('reset', () => {
+                        window.setTimeout(() => {
+                            const defaultTrip = tripTypeInput ? tripTypeInput.defaultValue || 'return' : 'return';
+                            setActiveTripType(defaultTrip);
+                        }, 0);
+                    });
+                }
+
+                if (scrollTargetId) {
+                    const target = document.getElementById(scrollTargetId);
+
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        target.classList.add('ring-2', 'ring-emerald-400', 'ring-offset-2', 'transition');
+
+                        window.setTimeout(() => {
+                            target.classList.remove('ring-2', 'ring-emerald-400', 'ring-offset-2');
+                        }, 2000);
+                    }
+                }
+            });
+        </script>
+        @include('payments.partials.stripe-checkout-script')
+    @endpush
 </x-app-layout>
