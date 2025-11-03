@@ -36,15 +36,24 @@
                     </div>
 
                     <div class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 p-1 text-sm font-semibold text-slate-600 shadow-sm">
-                        <button type="button" data-trip-type="return"
-                            class="trip-type-btn rounded-full border border-transparent bg-white px-5 py-2 text-slate-600 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2">
+                        <button
+                            type="button"
+                            data-trip-type="return"
+                            class="trip-type-btn rounded-full px-5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'return' ? 'bg-sky-600 text-white shadow-md border border-sky-600' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
+                        >
                             Return
                         </button>
-                        <button type="button" data-trip-type="one_way"
-                            class="trip-type-btn rounded-full border border-transparent bg-white px-5 py-2 text-slate-600 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2">
+                        <button
+                            type="button"
+                            data-trip-type="one_way"
+                            class="trip-type-btn rounded-full px-5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'one_way' ? 'bg-sky-600 text-white shadow-md border border-sky-600' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
+                        >
                             One-way
                         </button>
-                        <button type="button" data-trip-type="multi_city" disabled
+                        <button
+                            type="button"
+                            data-trip-type="multi_city"
+                            disabled
                             class="trip-type-btn rounded-full border border-transparent bg-white px-5 py-2 text-slate-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
                             title="Multi-city search is coming soon">
                             Multi-city
@@ -486,21 +495,21 @@
 
                     tripTypeButtons.forEach((button) => {
                         const isActive = button.dataset.tripType === value;
+                        const activeClasses = ['bg-sky-600', 'text-white', 'shadow-md', 'border', 'border-sky-600'];
+                        const inactiveClasses = ['bg-white', 'text-slate-600', 'border', 'border-transparent', 'hover:text-slate-900', 'hover:bg-slate-50'];
+
+                        if (button.disabled) {
+                            button.classList.remove(...activeClasses);
+                            button.classList.add('bg-white', 'text-slate-400', 'border', 'border-transparent', 'opacity-60');
+                            return;
+                        }
 
                         if (isActive) {
-                            button.classList.add('bg-sky-600', 'text-white', 'shadow-md', 'border-sky-600');
-                            button.classList.remove('text-slate-600', 'bg-white', 'hover:text-slate-900', 'hover:bg-slate-50', 'border-transparent');
+                            button.classList.remove(...inactiveClasses);
+                            button.classList.add(...activeClasses);
                         } else {
-                            if (button.disabled) {
-                                button.classList.add('bg-white', 'border-transparent');
-                                button.classList.add('text-slate-400', 'border-transparent');
-                                button.classList.remove('bg-sky-600', 'text-white', 'shadow-md', 'border-sky-600', 'hover:text-slate-900', 'hover:bg-slate-50');
-                                return;
-                            }
-
-                            button.classList.remove('bg-sky-600', 'text-white', 'shadow-md', 'border-sky-600');
-                            button.classList.add('text-slate-600', 'bg-white', 'hover:text-slate-900', 'hover:bg-slate-50', 'border-transparent');
-                            button.classList.remove('text-slate-400');
+                            button.classList.remove(...activeClasses, 'opacity-60');
+                            button.classList.add(...inactiveClasses);
                         }
                     });
 
