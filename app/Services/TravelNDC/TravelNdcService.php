@@ -3,12 +3,14 @@
 namespace App\Services\TravelNDC;
 
 use App\DataTransferObjects\FlightSearchData;
+use App\Services\TravelNDC\Demo\VidecomDemoProvider;
 use App\Services\TravelNDC\Exceptions\TravelNdcException;
 use Carbon\Carbon;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class TravelNdcService
@@ -19,6 +21,8 @@ class TravelNdcService
      * @var array<string, mixed>
      */
     private array $config;
+
+    private ?VidecomDemoProvider $demoProvider = null;
 
     public function __construct(private readonly TravelNdcClient $client)
     {
@@ -31,6 +35,22 @@ class TravelNdcService
     public function searchFlights(FlightSearchData $searchData, int $flexibleDays = 0, array $airlineFilters = []): array
     {
         $flexibleDays = max(0, min(3, $flexibleDays));
+
+        if ($this->usingVidecomDemo()) {
+            try {
+                return $this->searchFlightsViaVidecom($searchData, $flexibleDays, $airlineFilters);
+            } catch (TravelNdcException $exception) {
+                Log::warning('Videcom demo availability failed, falling back to Postman responses.', [
+                    'message' => $exception->getMessage(),
+                    'origin' => $searchData->origin,
+                    'destination' => $searchData->destination,
+                    'departure_date' => $searchData->departureDate->toDateString(),
+                    'return_date' => $searchData->returnDate?->toDateString(),
+                    'flexible_days' => $flexibleDays,
+                    'airline_filters' => $airlineFilters,
+                ]);
+            }
+        }
 
         $allOffers = [];
         $availableAirlines = [];
@@ -76,6 +96,10 @@ class TravelNdcService
      */
     public function priceOffer(array $offerPayload): array
     {
+        if ($this->usingVidecomDemo() && Arr::get($offerPayload, 'demo_provider') === 'videcom') {
+            return $this->priceVidecomOffer($offerPayload);
+        }
+
         foreach (['offer_id', 'owner', 'offer_items'] as $required) {
             if (!Arr::has($offerPayload, $required)) {
                 throw new TravelNdcException("Missing {$required} in offer payload.");
@@ -86,6 +110,105 @@ class TravelNdcService
         $responseXml = $this->client->post('offerprice', $requestXml);
 
         return $this->parseOfferPriceResponse($responseXml);
+    }
+
+    private function searchFlightsViaVidecom(FlightSearchData $searchData, int $flexibleDays, array $airlineFilters): array
+    {
+        $offers = [];
+        $airlines = [];
+
+        foreach ($this->generateSearchWindows($searchData, $flexibleDays) as $offset => $window) {
+            $result = $this->demoProvider()->search($window, $airlineFilters);
+
+            $windowOffers = array_map(function (array $offer) use ($offset, $window) {
+                $offer['day_offset'] = $offset;
+                $offer['departure_date'] = $window->departureDate->toDateString();
+
+                if ($window->isRoundTrip() && $window->returnDate) {
+                    $offer['return_date'] = $window->returnDate->toDateString();
+                }
+
+                return $offer;
+            }, $result['offers'] ?? []);
+
+            $offers = array_merge($offers, $windowOffers);
+            $airlines = array_merge($airlines, $result['airlines'] ?? []);
+        }
+
+        $offers = collect($offers)
+            ->sortBy([
+                fn ($offer) => $offer['day_offset'] ?? 0,
+                fn ($offer) => $offer['pricing']['total_amount'] ?? $offer['pricing']['base_amount'] ?? 0,
+            ])
+            ->values()
+            ->all();
+
+        return [
+            'offers' => $offers,
+            'airlines' => collect($airlines)->filter()->unique()->values()->all(),
+        ];
+    }
+
+    private function priceVidecomOffer(array $offerPayload): array
+    {
+        $pricing = Arr::get($offerPayload, 'ndc_pricing', Arr::get($offerPayload, 'pricing', []));
+
+        if (!is_array($pricing)) {
+            throw new TravelNdcException('Demo offer is missing pricing data.');
+        }
+
+        $base = round((float) ($pricing['base_amount'] ?? 0), 2);
+        $tax = round((float) ($pricing['tax_amount'] ?? 0), 2);
+        $total = round((float) ($pricing['total_amount'] ?? ($base + $tax)), 2);
+
+        return [
+            'currency' => Arr::get($offerPayload, 'currency', $this->config['currency'] ?? 'USD'),
+            'pricing' => [
+                'base_amount' => $base,
+                'tax_amount' => $tax,
+                'total_amount' => $total,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $offerPayload
+     * @param array<string, mixed> $details
+     * @return array<string, mixed>
+     */
+    public function holdVidecomOffer(array $offerPayload, array $details): array
+    {
+        if (!$this->canHoldVidecomOffer($offerPayload)) {
+            throw new TravelNdcException('Videcom booking is not available for this offer.');
+        }
+
+        return $this->demoProvider()->holdBooking($offerPayload, $details);
+    }
+
+    /**
+     * @param array<string, mixed> $offerPayload
+     */
+    public function canHoldVidecomOffer(array $offerPayload): bool
+    {
+        return $this->usingVidecomDemo()
+            && strtolower((string) Arr::get($offerPayload, 'demo_provider')) === 'videcom';
+    }
+
+    private function usingVidecomDemo(): bool
+    {
+        $mode = strtolower((string) ($this->config['mode'] ?? 'sandbox'));
+        $provider = strtolower((string) ($this->config['demo_provider'] ?? 'postman'));
+
+        return $mode === 'demo' && $provider === 'videcom';
+    }
+
+    private function demoProvider(): VidecomDemoProvider
+    {
+        if ($this->demoProvider === null) {
+            $this->demoProvider = new VidecomDemoProvider(null, config('travelndc.demo_videcom'));
+        }
+
+        return $this->demoProvider;
     }
 
     /**

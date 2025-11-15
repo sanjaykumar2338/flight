@@ -14,6 +14,7 @@ use App\Http\Controllers\Payments\PaystackCallbackController;
 use App\Http\Controllers\Payments\PaystackCheckoutController;
 use App\Http\Controllers\Payments\PaystackWebhookController;
 use App\Http\Controllers\Payments\StripeController;
+use App\Http\Controllers\VidecomHoldController;
 use App\Http\Controllers\Webhooks\StripeWebhookController;
 use Illuminate\Support\Facades\Route;
 
@@ -30,6 +31,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [FlightSearchController::class, 'index'])->name('flights.search');
 Route::post('/offers/price', OfferPricingController::class)->name('offers.price');
+Route::post('/offers/hold', VidecomHoldController::class)->name('offers.hold');
 Route::post('/checkout/paystack', PaystackCheckoutController::class)->name('checkout.paystack');
 Route::get('/bookings/{booking}/payment/callback', PaystackCallbackController::class)->name('bookings.paystack.callback');
 Route::post('/payments/stripe/checkout/{booking}', [StripeController::class, 'checkout'])->name('payments.stripe.checkout');

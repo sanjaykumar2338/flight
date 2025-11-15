@@ -99,6 +99,7 @@ class FlightSearchController extends Controller
         $pricedOffer = session()->pull('pricedOffer');
         $pricedBookingId = session()->pull('bookingId');
         $bookingCreated = session()->pull('bookingCreated');
+        $videcomHold = session()->pull('videcomHold');
         $pricedBooking = $pricedBookingId ? Booking::find($pricedBookingId) : null;
         $scrollTo = session()->pull('scrollTo');
 
@@ -122,6 +123,7 @@ class FlightSearchController extends Controller
             'pricedOffer' => $pricedOffer,
             'pricedBooking' => $pricedBooking,
             'bookingCreated' => $bookingCreated,
+            'videcomHold' => $videcomHold,
             'scrollTo' => $scrollTo,
         ]);
     }

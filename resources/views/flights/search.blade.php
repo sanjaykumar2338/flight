@@ -185,6 +185,34 @@
                 </div>
             @endif
 
+            @if ($errors->has('hold'))
+                <div class="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                    {{ $errors->first('hold') }}
+                </div>
+            @endif
+
+            @if (!empty($videcomHold))
+                @php
+                    $pnrCode = data_get($videcomHold, 'RLOC') ?? data_get($videcomHold, 'pnr');
+                    $ttlDate = data_get($videcomHold, 'TimeLimits.TTL.TTLDate');
+                    $ttlTime = data_get($videcomHold, 'TimeLimits.TTL.TTLTime');
+                    $ttlCity = data_get($videcomHold, 'TimeLimits.TTL.TTLCity');
+                @endphp
+                <div id="videcom-hold" class="rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+                    <p class="font-semibold">Videcom booking hold confirmed.</p>
+                    <p class="text-sm">
+                        PNR: <span class="font-mono font-semibold">{{ $pnrCode ?? 'N/A' }}</span>
+                        @if ($ttlDate || $ttlTime)
+                            – Held until {{ $ttlDate ?? '' }} {{ $ttlTime ?? '' }} {{ $ttlCity ?? '' }}
+                        @endif
+                    </p>
+                    <details class="mt-3">
+                        <summary class="cursor-pointer text-sm font-semibold text-emerald-800">View raw response</summary>
+                        <pre class="mt-2 overflow-auto rounded bg-white p-3 text-xs text-emerald-900">{{ json_encode($videcomHold, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</pre>
+                    </details>
+                </div>
+            @endif
+
             @if (!empty($pricedOffer) && $pricedBooking)
                 @php
                     $pricing = $pricedOffer['pricing'] ?? [];
@@ -337,8 +365,13 @@
             @endif
 
             @if ($searchPerformed)
-                <div class="grid gap-6 md:grid-cols-2">
-                    @foreach ($offers as $offer)
+                @if ($offers->isEmpty())
+                    <div class="rounded border border-yellow-200 bg-yellow-50 p-8 text-center text-yellow-900">
+                        No flight offers were found for the selected criteria. Try adjusting the dates, airports, or airline filters.
+                    </div>
+                @else
+                    <div class="grid gap-6 md:grid-cols-2">
+                        @foreach ($offers as $offer)
                         @php
                             $tokenPayload = base64_encode(json_encode([
                                 'offer_id' => $offer['offer_id'],
@@ -348,6 +381,11 @@
                                 'offer_items' => $offer['offer_items'] ?? [],
                                 'segments' => $offer['segments'] ?? [],
                                 'primary_carrier' => $offer['primary_carrier'] ?? $offer['owner'],
+                                'demo_provider' => $offer['demo_provider'] ?? null,
+                                'ndc_pricing' => \Illuminate\Support\Arr::only(
+                                    $offer['ndc_pricing'] ?? ($offer['pricing'] ?? []),
+                                    ['base_amount', 'tax_amount', 'total_amount']
+                                ),
                                 'pricing' => [
                                     'context' => $offer['pricing_context'] ?? ($offer['pricing']['context'] ?? []),
                                     'passengers' => $offer['passenger_summary'] ?? ($offer['pricing']['passengers'] ?? []),
@@ -462,9 +500,72 @@
                                     Price This Offer
                                 </button>
                             </form>
+
+                            @if (($offer['demo_provider'] ?? null) === 'videcom')
+                                <div class="mt-5 border-t border-gray-100 pt-4">
+                                    <p class="text-sm font-semibold text-gray-800">Hold this itinerary with Videcom</p>
+                                    <p class="text-xs text-gray-500">Creates a temporary reservation directly with Videcom.</p>
+
+                                    <form method="POST" action="{{ route('offers.hold') }}" class="mt-3 space-y-3">
+                                        @csrf
+                                        <input type="hidden" name="offer_token" value="{{ $tokenPayload }}">
+
+                                        <div class="grid gap-3 md:grid-cols-3">
+                                            <div>
+                                                <x-input-label for="passenger_title_{{ $loop->index }}" value="Title" />
+                                                <select id="passenger_title_{{ $loop->index }}" name="passenger_title"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                                    @foreach (['MR', 'MRS', 'MS'] as $title)
+                                                        <option value="{{ $title }}" @selected(old('passenger_title', 'MR') === $title)>
+                                                            {{ $title }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                <x-input-error :messages="$errors->get('passenger_title')" class="mt-1" />
+                                            </div>
+                                            <div>
+                                                <x-input-label for="passenger_first_name_{{ $loop->index }}" value="First Name" />
+                                                <x-text-input id="passenger_first_name_{{ $loop->index }}" name="passenger_first_name" type="text"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('passenger_first_name', auth()->user()?->name ? explode(' ', auth()->user()->name, 2)[0] : '') }}" />
+                                                <x-input-error :messages="$errors->get('passenger_first_name')" class="mt-1" />
+                                            </div>
+                                            <div>
+                                                <x-input-label for="passenger_last_name_{{ $loop->index }}" value="Last Name" />
+                                                <x-text-input id="passenger_last_name_{{ $loop->index }}" name="passenger_last_name" type="text"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('passenger_last_name') }}" />
+                                                <x-input-error :messages="$errors->get('passenger_last_name')" class="mt-1" />
+                                            </div>
+                                        </div>
+
+                                        <div class="grid gap-3 md:grid-cols-2">
+                                            <div>
+                                                <x-input-label for="contact_email_{{ $loop->index }}" value="Contact Email" />
+                                                <x-text-input id="contact_email_{{ $loop->index }}" name="contact_email" type="email"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('contact_email', auth()->user()?->email) }}" />
+                                                <x-input-error :messages="$errors->get('contact_email')" class="mt-1" />
+                                            </div>
+                                            <div>
+                                                <x-input-label for="contact_phone_{{ $loop->index }}" value="Contact Phone" />
+                                                <x-text-input id="contact_phone_{{ $loop->index }}" name="contact_phone" type="text"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('contact_phone') }}" />
+                                                <x-input-error :messages="$errors->get('contact_phone')" class="mt-1" />
+                                            </div>
+                                        </div>
+
+                                        <x-primary-button class="w-full justify-center">
+                                            {{ __('Hold Booking via Videcom') }}
+                                        </x-primary-button>
+                                    </form>
+                                </div>
+                            @endif
                         </div>
-                    @endforeach
-                </div>
+                        @endforeach
+                    </div>
+                @endif
             @else
                 <div class="rounded border border-gray-200 bg-white p-8 text-center text-gray-500">
                     Search for flights to see available offers.

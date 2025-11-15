@@ -7,6 +7,19 @@ $loader = PostmanCollectionLoader::instance();
 
 $agencyId = env('TRAVELNDC_AGENCY_ID') ?: null;
 $mode = env('TRAVELNDC_MODE', 'sandbox');
+$demoProviderEnv = env('TRAVELNDC_DEMO_PROVIDER');
+$demoProvider = $demoProviderEnv ?: (env('TRAVELNDC_VIDECOM_TOKEN') ? 'videcom' : 'postman');
+
+$demoVidecom = [
+    'endpoint' => env('TRAVELNDC_VIDECOM_ENDPOINT', 'https://customertest.videcom.com/xejet/vrsxmlservice/vrsxmlwebservice3.asmx'),
+    'token' => env('TRAVELNDC_VIDECOM_TOKEN'),
+    'timeout' => (int) env('TRAVELNDC_VIDECOM_TIMEOUT', 30),
+    'verify_ssl' => (bool) env('TRAVELNDC_VIDECOM_VERIFY_SSL', false),
+    'currency' => env('TRAVELNDC_VIDECOM_CURRENCY', env('TRAVELNDC_CURRENCY', 'USD')),
+    'default_base_fare' => (float) env('TRAVELNDC_VIDECOM_DEFAULT_BASE', 0),
+    'fare_per_minute' => (float) env('TRAVELNDC_VIDECOM_FARE_PER_MINUTE', 0),
+    'default_tax_percent' => (float) env('TRAVELNDC_VIDECOM_DEFAULT_TAX_PERCENT', 0),
+];
 
 $normalizeUrl = static function (?string $value, ?string $agencyId = null): ?string {
     if ($value === null || $value === '') {
@@ -67,6 +80,7 @@ foreach ($templates as $key => $template) {
 
 return [
     'mode' => $mode,
+    'demo_provider' => $demoProvider,
     'base_url' => $baseUrl,
     'client_id' => env('TRAVELNDC_CLIENT_ID'),
     'client_secret' => env('TRAVELNDC_CLIENT_SECRET'),
@@ -86,6 +100,7 @@ return [
     ],
     'templates' => $templates,
     'demo_responses' => $loader->responses(),
+    'demo_videcom' => $demoVidecom,
     // Legacy keys retained for compatibility while the application migrates to named endpoints.
     'air_shopping_path' => $resolveEndpoint('airshopping', 'TRAVELNDC_AIR_SHOPPING_PATH'),
     'offer_price_path' => $resolveEndpoint('offerprice', 'TRAVELNDC_OFFER_PRICE_PATH'),

@@ -5,9 +5,11 @@ namespace App\Services\Pricing;
 use App\Models\PricingRule;
 use App\Support\Money;
 use Carbon\Carbon;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Log;
 
 class PricingEngine
 {
@@ -129,31 +131,48 @@ class PricingEngine
 
     protected function activeRulesForCarrier(?string $carrier): Collection
     {
-        $generic = Cache::remember(
-            PricingRule::CACHE_KEY_PREFIX.PricingRule::CACHE_KEY_GENERIC,
-            $this->cacheTtlSeconds,
-            fn () => PricingRule::query()
-                ->active()
-                ->whereNull('carrier')
-                ->orderBy('priority')
-                ->orderBy('id')
-                ->get()
-        );
+        try {
+            $generic = Cache::remember(
+                PricingRule::CACHE_KEY_PREFIX.PricingRule::CACHE_KEY_GENERIC,
+                $this->cacheTtlSeconds,
+                fn () => PricingRule::query()
+                    ->active()
+                    ->whereNull('carrier')
+                    ->orderBy('priority')
+                    ->orderBy('id')
+                    ->get()
+            );
+        } catch (QueryException $exception) {
+            Log::warning('Unable to load generic pricing rules; falling back to defaults.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return collect();
+        }
 
         if (!$carrier) {
             return $generic;
         }
 
-        $specific = Cache::remember(
-            PricingRule::CACHE_KEY_PREFIX.$carrier,
-            $this->cacheTtlSeconds,
-            fn () => PricingRule::query()
-                ->active()
-                ->where('carrier', $carrier)
-                ->orderBy('priority')
-                ->orderBy('id')
-                ->get()
-        );
+        try {
+            $specific = Cache::remember(
+                PricingRule::CACHE_KEY_PREFIX.$carrier,
+                $this->cacheTtlSeconds,
+                fn () => PricingRule::query()
+                    ->active()
+                    ->where('carrier', $carrier)
+                    ->orderBy('priority')
+                    ->orderBy('id')
+                    ->get()
+            );
+        } catch (QueryException $exception) {
+            Log::warning('Unable to load carrier-specific pricing rules; using generic set.', [
+                'carrier' => $carrier,
+                'message' => $exception->getMessage(),
+            ]);
+
+            return $generic;
+        }
 
         return $generic->merge($specific);
     }

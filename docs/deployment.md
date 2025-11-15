@@ -8,7 +8,7 @@
    - Copy `.env.example` to `.env` and set:
      - `APP_URL` to the public domain.
      - Database credentials (`DB_*`).
-     - TravelNDC credentials or leave `TRAVELNDC_MODE=demo` for canned responses.
+     - TravelNDC credentials or leave `TRAVELNDC_MODE=demo`. When running in demo mode, set `TRAVELNDC_VIDECOM_TOKEN` (and related `TRAVELNDC_VIDECOM_*` values) to stream live availability from the Videcom SOAP feed; omit them to fall back to the bundled Postman responses.
      - Paystack keys (`PAYSTACK_PUBLIC_KEY`, `PAYSTACK_SECRET_KEY`, `PAYSTACK_WEBHOOK_SECRET`) and set `PAYSTACK_MODE` to `sandbox` or `live`.
    - Generate the application key: `php artisan key:generate`.
 
