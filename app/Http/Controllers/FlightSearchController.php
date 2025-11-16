@@ -125,21 +125,7 @@ class FlightSearchController extends Controller
             'bookingCreated' => $bookingCreated,
             'videcomHold' => $videcomHold,
             'scrollTo' => $scrollTo,
-            'airports' => $this->airportOptions(),
         ]);
-    }
-
-    private function airportOptions(): array
-    {
-        $airports = config('airports', []);
-
-        return collect($airports)
-            ->map(fn ($name, $code) => [
-                'code' => strtoupper($code),
-                'name' => $name,
-            ])
-            ->values()
-            ->all();
     }
 
     private function buildPassengerSummary(FlightSearchData $searchData): array

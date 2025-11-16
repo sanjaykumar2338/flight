@@ -61,17 +61,19 @@
                     </div>
 
                     <div class="grid gap-4 md:grid-cols-[1fr_auto_1fr]">
-                        <div>
-                            <x-input-label for="origin" value="From" />
-                            <select id="origin" name="origin"
-                                class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                <option value="">Select departure</option>
-                                @foreach (($airports ?? []) as $airport)
-                                    <option value="{{ $airport['code'] }}" @selected(old('origin', $search['origin'] ?? '') === $airport['code'])>
-                                        {{ $airport['name'] }} ({{ $airport['code'] }})
-                                    </option>
-                                @endforeach
-                            </select>
+                        <div data-airport-selector="origin" class="airport-selector">
+                            <x-input-label for="origin_search" value="From" />
+                            <input type="hidden" id="origin" name="origin" value="{{ old('origin', $search['origin'] ?? '') }}">
+                            <div class="mt-2 flex flex-wrap gap-2" data-airport-selected></div>
+                            <div class="relative mt-2">
+                                <input id="origin_search" type="text" data-airport-search
+                                    class="w-full rounded-lg border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                    placeholder="Search city, country or code" autocomplete="off">
+                                <div
+                                    class="airport-dropdown absolute z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl hidden"
+                                    data-airport-dropdown></div>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Type at least two letters to search.</p>
                             <x-input-error :messages="$errors->get('origin')" class="mt-2" />
                         </div>
                         <div class="flex items-end justify-center pb-1 md:pb-0">
@@ -80,17 +82,19 @@
                                 &#8646;
                             </button>
                         </div>
-                        <div>
-                            <x-input-label for="destination" value="To" />
-                            <select id="destination" name="destination"
-                                class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                <option value="">Select arrival</option>
-                                @foreach (($airports ?? []) as $airport)
-                                    <option value="{{ $airport['code'] }}" @selected(old('destination', $search['destination'] ?? '') === $airport['code'])>
-                                        {{ $airport['name'] }} ({{ $airport['code'] }})
-                                    </option>
-                                @endforeach
-                            </select>
+                        <div data-airport-selector="destination" class="airport-selector">
+                            <x-input-label for="destination_search" value="To" />
+                            <input type="hidden" id="destination" name="destination" value="{{ old('destination', $search['destination'] ?? '') }}">
+                            <div class="mt-2 flex flex-wrap gap-2" data-airport-selected></div>
+                            <div class="relative mt-2">
+                                <input id="destination_search" type="text" data-airport-search
+                                    class="w-full rounded-lg border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                    placeholder="Search city, country or code" autocomplete="off">
+                                <div
+                                    class="airport-dropdown absolute z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl hidden"
+                                    data-airport-dropdown></div>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Search for any airport worldwide.</p>
                             <x-input-error :messages="$errors->get('destination')" class="mt-2" />
                         </div>
                     </div>
@@ -598,8 +602,6 @@
                 const returnWrapper = document.getElementById('return_date_wrapper');
                 const returnInput = document.getElementById('return_date');
                 const swapRoutesButton = document.getElementById('swap_routes');
-                const originInput = document.getElementById('origin');
-                const destinationInput = document.getElementById('destination');
 
                 const setActiveTripType = (value) => {
                     if (!tripTypeInput) {
@@ -652,12 +654,11 @@
                     });
                 });
 
-                if (swapRoutesButton && originInput && destinationInput) {
+                if (swapRoutesButton) {
                     swapRoutesButton.addEventListener('click', () => {
-                        const originalValue = originInput.value;
-                        originInput.value = destinationInput.value;
-                        destinationInput.value = originalValue;
-                        originInput.focus();
+                        if (window.AirportSelectorManager) {
+                            window.AirportSelectorManager.swap('origin', 'destination');
+                        }
                     });
                 }
 
@@ -667,6 +668,9 @@
                         window.setTimeout(() => {
                             const defaultTrip = tripTypeInput ? tripTypeInput.defaultValue || 'return' : 'return';
                             setActiveTripType(defaultTrip);
+                            if (window.AirportSelectorManager) {
+                                window.AirportSelectorManager.refreshAll();
+                            }
                         }, 0);
                     });
                 }
