@@ -63,8 +63,15 @@
                     <div class="grid gap-4 md:grid-cols-[1fr_auto_1fr]">
                         <div>
                             <x-input-label for="origin" value="From" />
-                            <x-text-input id="origin" name="origin" type="text" maxlength="3" class="mt-1 block w-full uppercase"
-                                placeholder="e.g. SIN" value="{{ old('origin', $search['origin'] ?? '') }}" />
+                            <select id="origin" name="origin"
+                                class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                <option value="">Select departure</option>
+                                @foreach (($airports ?? []) as $airport)
+                                    <option value="{{ $airport['code'] }}" @selected(old('origin', $search['origin'] ?? '') === $airport['code'])>
+                                        {{ $airport['name'] }} ({{ $airport['code'] }})
+                                    </option>
+                                @endforeach
+                            </select>
                             <x-input-error :messages="$errors->get('origin')" class="mt-2" />
                         </div>
                         <div class="flex items-end justify-center pb-1 md:pb-0">
@@ -75,8 +82,15 @@
                         </div>
                         <div>
                             <x-input-label for="destination" value="To" />
-                            <x-text-input id="destination" name="destination" type="text" maxlength="3" class="mt-1 block w-full uppercase"
-                                placeholder="e.g. LHR" value="{{ old('destination', $search['destination'] ?? '') }}" />
+                            <select id="destination" name="destination"
+                                class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                <option value="">Select arrival</option>
+                                @foreach (($airports ?? []) as $airport)
+                                    <option value="{{ $airport['code'] }}" @selected(old('destination', $search['destination'] ?? '') === $airport['code'])>
+                                        {{ $airport['name'] }} ({{ $airport['code'] }})
+                                    </option>
+                                @endforeach
+                            </select>
                             <x-input-error :messages="$errors->get('destination')" class="mt-2" />
                         </div>
                     </div>
@@ -397,7 +411,7 @@
                             <div class="space-y-3">
                                 <div class="flex items-center justify-between">
                                     <span class="text-sm font-medium text-indigo-600">
-                                        {{ $offer['primary_carrier'] ?? $offer['owner'] }}
+                                        {{ $offer['airline_name'] ?? ($offer['primary_carrier'] ?? $offer['owner']) }}
                                     </span>
                                     <span class="text-xs uppercase tracking-wide text-gray-500">
                                         {{ $offer['departure_date'] }}

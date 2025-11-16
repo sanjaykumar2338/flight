@@ -4,6 +4,7 @@ namespace App\Services\TravelNDC\Demo;
 
 use App\DataTransferObjects\FlightSearchData;
 use App\Services\TravelNDC\Exceptions\TravelNdcException;
+use App\Support\AirlineDirectory;
 use Carbon\Carbon;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
@@ -226,6 +227,7 @@ class VidecomDemoProvider
                 'carrier' => $carrier,
             ]],
             'primary_carrier' => $carrier,
+            'airline_name' => AirlineDirectory::name($carrier, $carrier),
             'demo_provider' => 'videcom',
             'source' => 'videcom-demo',
         ];

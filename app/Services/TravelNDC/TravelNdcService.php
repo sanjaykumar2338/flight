@@ -5,6 +5,7 @@ namespace App\Services\TravelNDC;
 use App\DataTransferObjects\FlightSearchData;
 use App\Services\TravelNDC\Demo\VidecomDemoProvider;
 use App\Services\TravelNDC\Exceptions\TravelNdcException;
+use App\Support\AirlineDirectory;
 use Carbon\Carbon;
 use DOMDocument;
 use DOMElement;
@@ -731,6 +732,7 @@ class TravelNdcService
                 ->all();
 
             $primaryCarrier = trim((string) ($offerSegments[0]['marketing_carrier'] ?? ($offerItems[0]['carrier'] ?? $owner)));
+            $carrierName = AirlineDirectory::name($primaryCarrier, $primaryCarrier);
 
             $pricingOffers[] = [
                 'offer_id' => $offerId,
@@ -745,6 +747,7 @@ class TravelNdcService
                 'segments' => $offerSegments,
                 'offer_items' => $offerItems,
                 'primary_carrier' => $primaryCarrier,
+                'airline_name' => $carrierName,
             ];
 
             $airlines[] = $primaryCarrier;
