@@ -16,6 +16,7 @@ class PostmanCollectionLoader
         'airshopping' => ['airshopping', 'airshoping'],
         'offerprice' => ['offerprice'],
         'ordercreate' => ['ordercreate'],
+        'orderchange' => ['orderchange'],
         'orderretrieve' => ['orderretrieve'],
         'ordercancel' => ['ordercancel'],
     ];

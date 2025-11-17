@@ -69,6 +69,11 @@ class OfferPricingController extends Controller
 
         $commissionAmount = round($pricing['payable_total'] - ($pricing['ndc']['base_amount'] + $pricing['ndc']['tax_amount']), 2);
 
+        $itineraryPayload = [
+            'segments' => Arr::get($payload, 'segments', []),
+            'offer_items' => Arr::get($payload, 'offer_items', []),
+        ];
+
         $booking = Booking::create([
             'user_id' => Auth::id(),
             'airline_code' => strtoupper((string) Arr::get($payload, 'primary_carrier', Arr::get($payload, 'owner'))),
@@ -88,9 +93,7 @@ class OfferPricingController extends Controller
                 'segments' => count(Arr::get($payload, 'segments', [])),
                 'offer_items' => count(Arr::get($payload, 'offer_items', [])),
             ],
-            'itinerary_json' => json_encode([
-                'segments' => Arr::get($payload, 'segments', []),
-            ], JSON_UNESCAPED_SLASHES),
+            'itinerary_json' => json_encode($itineraryPayload, JSON_UNESCAPED_SLASHES),
             'pricing_json' => json_encode($pricing, JSON_UNESCAPED_SLASHES),
         ]);
 
@@ -99,15 +102,23 @@ class OfferPricingController extends Controller
             'offer_id' => Arr::get($payload, 'offer_id'),
         ]);
 
+        $offerSnapshot = [
+            'offer_id' => Arr::get($payload, 'offer_id'),
+            'owner' => Arr::get($payload, 'owner'),
+            'response_id' => Arr::get($payload, 'response_id'),
+            'currency' => Arr::get($pricedOffer, 'currency', Arr::get($payload, 'currency', config('travelndc.currency', 'USD'))),
+            'segments' => Arr::get($payload, 'segments', []),
+            'offer_items' => Arr::get($payload, 'offer_items', []),
+            'demo_provider' => Arr::get($payload, 'demo_provider'),
+        ];
+
+        $orderToken = base64_encode(json_encode($offerSnapshot, JSON_UNESCAPED_SLASHES));
+
         return redirect()->back()->with([
-            'pricedOffer' => [
-                'offer_id' => Arr::get($payload, 'offer_id'),
-                'owner' => Arr::get($payload, 'owner'),
-                'response_id' => Arr::get($payload, 'response_id'),
-                'currency' => Arr::get($pricedOffer, 'currency', Arr::get($payload, 'currency', config('travelndc.currency', 'USD'))),
-                'segments' => Arr::get($payload, 'segments', []),
+            'pricedOffer' => array_merge($offerSnapshot, [
                 'pricing' => $pricing,
-            ],
+                'token' => $orderToken,
+            ]),
             'bookingId' => $booking->id,
             'bookingCreated' => [
                 'id' => $booking->id,

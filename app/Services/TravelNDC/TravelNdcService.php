@@ -37,11 +37,17 @@ class TravelNdcService
     {
         $flexibleDays = max(0, min(3, $flexibleDays));
 
+        $ndcResult = $this->searchTravelNdcEngine($searchData, $flexibleDays, $airlineFilters);
+        $offers = $ndcResult['offers'];
+        $airlines = $ndcResult['airlines'];
+
         if ($this->usingVidecomDemo()) {
             try {
-                return $this->searchFlightsViaVidecom($searchData, $flexibleDays, $airlineFilters);
+                $videcomResult = $this->searchFlightsViaVidecom($searchData, $flexibleDays, $airlineFilters);
+                $offers = array_merge($offers, $videcomResult['offers']);
+                $airlines = array_merge($airlines, $videcomResult['airlines']);
             } catch (TravelNdcException $exception) {
-                Log::warning('Videcom demo availability failed, falling back to Postman responses.', [
+                Log::warning('Videcom demo availability failed, falling back to TravelNDC-only results.', [
                     'message' => $exception->getMessage(),
                     'origin' => $searchData->origin,
                     'destination' => $searchData->destination,
@@ -53,6 +59,63 @@ class TravelNdcService
             }
         }
 
+        $offers = $this->sortOffers($offers);
+
+        return [
+            'offers' => $offers,
+            'airlines' => collect($airlines)->filter()->unique()->values()->all(),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $offerPayload
+     * @return array<string, mixed>
+     */
+    public function priceOffer(array $offerPayload): array
+    {
+        if ($this->usingVidecomDemo() && Arr::get($offerPayload, 'demo_provider') === 'videcom') {
+            return $this->priceVidecomOffer($offerPayload);
+        }
+
+        foreach (['offer_id', 'owner', 'offer_items'] as $required) {
+            if (!Arr::has($offerPayload, $required)) {
+                throw new TravelNdcException("Missing {$required} in offer payload.");
+            }
+        }
+
+        $requestXml = $this->buildOfferPriceXml($offerPayload);
+        $responseXml = $this->client->post('offerprice', $requestXml);
+
+        return $this->parseOfferPriceResponse($responseXml);
+    }
+
+    /**
+     * @param array<string, mixed> $offerPayload
+     * @param array<int, array<string, mixed>> $passengers
+     * @param array<string, string> $contact
+     * @return array<string, mixed>
+     */
+    public function createOrder(array $offerPayload, array $passengers, array $contact): array
+    {
+        $requestXml = $this->buildOrderCreateXml($offerPayload, $passengers, $contact);
+        $responseXml = $this->client->post('ordercreate', $requestXml);
+
+        return $this->parseOrderCreateResponse($responseXml);
+    }
+
+    public function ticketOrder(string $orderId, string $owner, float $amount, string $currency): array
+    {
+        $requestXml = $this->buildOrderChangeXml($orderId, $owner, $amount, $currency);
+        $responseXml = $this->client->post('orderchange', $requestXml);
+
+        return $this->parseOrderChangeResponse($responseXml);
+    }
+
+    /**
+     * @return array{offers: array<int, array<string, mixed>>, airlines: array<int, string>}
+     */
+    private function searchTravelNdcEngine(FlightSearchData $searchData, int $flexibleDays, array $airlineFilters): array
+    {
         $allOffers = [];
         $availableAirlines = [];
 
@@ -77,40 +140,25 @@ class TravelNdcService
             $availableAirlines = array_merge($availableAirlines, $parsed['airlines']);
         }
 
-        $allOffers = collect($allOffers)
-            ->sortBy([
-                fn ($offer) => $offer['day_offset'] ?? 0,
-                fn ($offer) => $offer['pricing']['total_amount'] ?? $offer['pricing']['base_amount'] ?? 0,
-            ])
-            ->values()
-            ->all();
-
         return [
             'offers' => $allOffers,
-            'airlines' => collect($availableAirlines)->filter()->unique()->values()->all(),
+            'airlines' => $availableAirlines,
         ];
     }
 
     /**
-     * @param array<string, mixed> $offerPayload
-     * @return array<string, mixed>
+     * @param array<int, array<string, mixed>> $offers
+     * @return array<int, array<string, mixed>>
      */
-    public function priceOffer(array $offerPayload): array
+    private function sortOffers(array $offers): array
     {
-        if ($this->usingVidecomDemo() && Arr::get($offerPayload, 'demo_provider') === 'videcom') {
-            return $this->priceVidecomOffer($offerPayload);
-        }
-
-        foreach (['offer_id', 'owner', 'offer_items'] as $required) {
-            if (!Arr::has($offerPayload, $required)) {
-                throw new TravelNdcException("Missing {$required} in offer payload.");
-            }
-        }
-
-        $requestXml = $this->buildOfferPriceXml($offerPayload);
-        $responseXml = $this->client->post('offerprice', $requestXml);
-
-        return $this->parseOfferPriceResponse($responseXml);
+        return collect($offers)
+            ->sortBy([
+                fn ($offer) => $offer['departure_date'] ?? $offer['segments'][0]['departure'] ?? '',
+                fn ($offer) => $offer['pricing']['total_amount'] ?? $offer['pricing']['base_amount'] ?? 0,
+            ])
+            ->values()
+            ->all();
     }
 
     private function searchFlightsViaVidecom(FlightSearchData $searchData, int $flexibleDays, array $airlineFilters): array
@@ -748,6 +796,7 @@ class TravelNdcService
                 'offer_items' => $offerItems,
                 'primary_carrier' => $primaryCarrier,
                 'airline_name' => $carrierName,
+                'source' => 'travelndc',
             ];
 
             $airlines[] = $primaryCarrier;
@@ -800,6 +849,370 @@ class TravelNdcService
         ];
     }
 
+    /**
+     * @param array<string, mixed> $offerPayload
+     * @param array<int, array<string, mixed>> $passengers
+     * @param array<string, string> $contact
+     */
+    private function buildOrderCreateXml(array $offerPayload, array $passengers, array $contact): string
+    {
+        $doc = $this->loadTemplateDocument($this->getTemplate('ordercreate'));
+
+        $root = $doc->documentElement;
+
+        if (!$root instanceof DOMElement) {
+            throw new TravelNdcException('OrderCreate template is invalid.');
+        }
+
+        $xpath = $this->createXPath($doc, $root);
+
+        $this->setDocumentName($doc, $xpath);
+        $this->applyTravelAgencyDetails($doc, $xpath);
+        $this->updateRecipientAirline($doc, $xpath, Arr::get($offerPayload, 'owner'));
+
+        $structuredPassengers = $this->structurePassengersForOrder($passengers);
+
+        $this->applyOrderOfferDetails($doc, $xpath, $offerPayload, $structuredPassengers);
+        $this->replaceOrderPassengerList($doc, $xpath, $structuredPassengers, $contact);
+
+        return $doc->saveXML() ?: '';
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $passengers
+     * @return array<int, array<string, mixed>>
+     */
+    private function structurePassengersForOrder(array $passengers): array
+    {
+        $structured = [];
+        $counts = [];
+        $index = 1;
+
+        foreach ($passengers as $passenger) {
+            $ptc = strtoupper((string) ($passenger['ptc'] ?? 'ADT'));
+            $counts[$ptc] = ($counts[$ptc] ?? 0) + 1;
+
+            $structured[] = [
+                'id' => sprintf('PAX%d', $index++),
+                'ptc' => $ptc,
+                'original_ref' => sprintf('%s%d', $ptc, $counts[$ptc]),
+                'birthdate' => $passenger['birthdate'] ?? null,
+                'gender' => ucfirst(strtolower((string) ($passenger['gender'] ?? 'Male'))),
+                'title' => $passenger['title'] ?? null,
+                'given_name' => $passenger['given_name'] ?? null,
+                'surname' => $passenger['surname'] ?? null,
+            ];
+        }
+
+        return $structured;
+    }
+
+    /**
+     * @param array<string, mixed> $offerPayload
+     * @param array<int, array<string, mixed>> $passengers
+     */
+    private function applyOrderOfferDetails(DOMDocument $doc, DOMXPath $xpath, array $offerPayload, array $passengers): void
+    {
+        $offerNode = $xpath->query('//ns:Query//ns:Order//ns:Offer')->item(0);
+
+        if (!$offerNode instanceof DOMElement) {
+            return;
+        }
+
+        $offerNode->setAttribute('OfferID', (string) Arr::get($offerPayload, 'offer_id'));
+        $offerNode->setAttribute('Owner', (string) Arr::get($offerPayload, 'owner'));
+
+        if ($responseId = Arr::get($offerPayload, 'response_id')) {
+            $offerNode->setAttribute('ResponseID', (string) $responseId);
+        } else {
+            $offerNode->removeAttribute('ResponseID');
+        }
+
+        while ($offerNode->firstChild) {
+            $offerNode->removeChild($offerNode->firstChild);
+        }
+
+        $refMap = $this->mapPassengerReferencesForOrder($passengers);
+        $defaultRef = $passengers[0]['id'] ?? 'PAX1';
+
+        foreach (Arr::get($offerPayload, 'offer_items', []) as $item) {
+            $offerItem = $doc->createElementNS(self::NAMESPACE_URI, 'OfferItem');
+            $offerItem->setAttribute('OfferItemID', (string) Arr::get($item, 'offer_item_id'));
+
+            $passengerRefs = array_filter(array_map('trim', (array) Arr::get($item, 'passenger_refs', [])));
+
+            if (empty($passengerRefs)) {
+                $offerItem->appendChild($this->createElement($doc, 'PassengerRefs', implode(' ', array_column($passengers, 'id'))));
+            } else {
+                $mappedRefs = [];
+
+                foreach ($passengerRefs as $reference) {
+                    $mappedRefs[] = $refMap[$reference] ?? $defaultRef;
+                }
+
+                $offerItem->appendChild($this->createElement($doc, 'PassengerRefs', implode(' ', array_unique($mappedRefs))));
+            }
+
+            $offerNode->appendChild($offerItem);
+        }
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $passengers
+     * @return array<string, string>
+     */
+    private function mapPassengerReferencesForOrder(array $passengers): array
+    {
+        $map = [];
+
+        foreach ($passengers as $passenger) {
+            $map[$passenger['original_ref']] = $passenger['id'];
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $passengers
+     * @param array<string, string> $contact
+     */
+    private function replaceOrderPassengerList(DOMDocument $doc, DOMXPath $xpath, array $passengers, array $contact): void
+    {
+        $dataListsNode = $xpath->query('//ns:Query//ns:DataLists')->item(0);
+
+        if (!$dataListsNode instanceof DOMElement) {
+            return;
+        }
+
+        foreach (['PassengerList', 'ContactList'] as $nodeName) {
+            $existing = $this->firstChildElement($dataListsNode, $nodeName);
+            if ($existing instanceof DOMElement) {
+                $dataListsNode->removeChild($existing);
+            }
+        }
+
+        $contactId = 'CONTACT1';
+
+        $passengerList = $doc->createElementNS(self::NAMESPACE_URI, 'PassengerList');
+
+        foreach ($passengers as $index => $passenger) {
+            $passengerElement = $doc->createElementNS(self::NAMESPACE_URI, 'Passenger');
+            $passengerElement->setAttribute('PassengerID', $passenger['id']);
+            $passengerElement->appendChild($this->createElement($doc, 'PTC', $passenger['ptc']));
+
+            if (!empty($passenger['birthdate'])) {
+                $passengerElement->appendChild($this->createElement($doc, 'Birthdate', $passenger['birthdate']));
+            }
+
+            $individual = $doc->createElementNS(self::NAMESPACE_URI, 'Individual');
+            $individual->appendChild($this->createElement($doc, 'Gender', $passenger['gender']));
+            $individual->appendChild($this->createElement($doc, 'NameTitle', $passenger['title']));
+            $individual->appendChild($this->createElement($doc, 'GivenName', $passenger['given_name']));
+            $individual->appendChild($this->createElement($doc, 'Surname', $passenger['surname']));
+
+            $passengerElement->appendChild($individual);
+
+            if ($index === 0 && (!empty($contact['email']) || !empty($contact['phone']))) {
+                $passengerElement->appendChild($this->createElement($doc, 'ContactInfoRef', $contactId));
+            }
+
+            $passengerList->appendChild($passengerElement);
+        }
+
+        $dataListsNode->appendChild($passengerList);
+
+        if (!empty($contact['email']) || !empty($contact['phone'])) {
+            $contactList = $doc->createElementNS(self::NAMESPACE_URI, 'ContactList');
+            $contactInfo = $doc->createElementNS(self::NAMESPACE_URI, 'ContactInformation');
+            $contactInfo->setAttribute('ContactID', $contactId);
+
+            if (!empty($contact['email'])) {
+                $contactProvided = $doc->createElementNS(self::NAMESPACE_URI, 'ContactProvided');
+                $email = $doc->createElementNS(self::NAMESPACE_URI, 'EmailAddress');
+                $email->appendChild($this->createElement($doc, 'EmailAddressValue', $contact['email']));
+                $contactProvided->appendChild($email);
+                $contactInfo->appendChild($contactProvided);
+            }
+
+            if (!empty($contact['phone'])) {
+                [$dialingCode, $number] = $this->splitPhoneDetails($contact['phone']);
+                $contactProvided = $doc->createElementNS(self::NAMESPACE_URI, 'ContactProvided');
+                $phone = $doc->createElementNS(self::NAMESPACE_URI, 'Phone');
+                $phone->appendChild($this->createElement($doc, 'Label', 'Mobile'));
+                $phone->appendChild($this->createElement($doc, 'CountryDialingCode', $dialingCode));
+                $phone->appendChild($this->createElement($doc, 'PhoneNumber', $number));
+                $contactProvided->appendChild($phone);
+                $contactInfo->appendChild($contactProvided);
+            }
+
+            $contactList->appendChild($contactInfo);
+            $dataListsNode->appendChild($contactList);
+        }
+    }
+
+    private function splitPhoneDetails(string $raw): array
+    {
+        $digits = preg_replace('/[^0-9]/', '', $raw) ?: '0';
+
+        if (str_starts_with($raw, '+') && strlen($digits) > 3) {
+            $country = substr($digits, 0, 3);
+            $number = substr($digits, 3) ?: substr($digits, 1);
+            return [$country, $number ?: $digits];
+        }
+
+        if (strlen($digits) > 10) {
+            return [substr($digits, 0, 3), substr($digits, 3)];
+        }
+
+        return ['1', $digits];
+    }
+
+    private function parseOrderCreateResponse(string $xmlContent): array
+    {
+        $dom = new DOMDocument();
+
+        if (!@$dom->loadXML($xmlContent)) {
+            throw new TravelNdcException('Unable to parse OrderCreate response (invalid XML).');
+        }
+
+        $xpath = new DOMXPath($dom);
+        $namespace = $dom->documentElement?->namespaceURI ?? self::NAMESPACE_URI;
+        $xpath->registerNamespace('ns', $namespace);
+
+        $this->assertNoErrors($xpath);
+
+        $orderId = $this->firstNodeValue($xpath, [
+            '//ns:OrderViewRS//ns:OrderID',
+            '//ns:OrderCreateRS//ns:OrderID',
+            '//ns:Order//ns:OrderID',
+        ]);
+
+        if (!$orderId) {
+            $attribute = $xpath->query('//ns:Order/@OrderID')->item(0);
+            if ($attribute instanceof \DOMAttr && trim($attribute->value) !== '') {
+                $orderId = trim($attribute->value);
+            }
+        }
+
+        if (!$orderId) {
+            throw new TravelNdcException('OrderCreate response did not include an OrderID.');
+        }
+
+        return [
+            'order_id' => $orderId,
+            'response_id' => $this->firstNodeValue($xpath, ['//ns:ResponseID']),
+            'raw_response' => $xmlContent,
+        ];
+    }
+
+    private function buildOrderChangeXml(string $orderId, string $owner, float $amount, string $currency): string
+    {
+        $doc = $this->loadTemplateDocument($this->getTemplate('orderchange'));
+
+        $root = $doc->documentElement;
+
+        if (!$root instanceof DOMElement) {
+            throw new TravelNdcException('OrderChange template is invalid.');
+        }
+
+        $xpath = $this->createXPath($doc, $root);
+
+        $this->setDocumentName($doc, $xpath);
+        $this->applyTravelAgencyDetails($doc, $xpath);
+        $this->updateRecipientAirline($doc, $xpath, $owner);
+        $this->replaceOrderChangeOrderId($doc, $xpath, $orderId, $owner);
+        $this->replaceOrderChangePayments($doc, $xpath, $amount, $currency);
+
+        return $doc->saveXML() ?: '';
+    }
+
+    private function replaceOrderChangeOrderId(DOMDocument $doc, DOMXPath $xpath, string $orderId, string $owner): void
+    {
+        $orderIdNode = $xpath->query('//ns:Query//ns:OrderID')->item(0);
+
+        if (!$orderIdNode instanceof DOMElement) {
+            $queryNode = $xpath->query('//ns:Query')->item(0);
+            if (!$queryNode instanceof DOMElement) {
+                return;
+            }
+            $orderIdNode = $doc->createElementNS(self::NAMESPACE_URI, 'OrderID');
+            $queryNode->appendChild($orderIdNode);
+        }
+
+        $orderIdNode->setAttribute('Owner', strtoupper($owner));
+        $this->setElementText($doc, $orderIdNode, $orderId);
+    }
+
+    private function replaceOrderChangePayments(DOMDocument $doc, DOMXPath $xpath, float $amount, string $currency): void
+    {
+        $queryNode = $xpath->query('//ns:Query')->item(0);
+
+        if (!$queryNode instanceof DOMElement) {
+            return;
+        }
+
+        $paymentsNode = $this->firstChildElement($queryNode, 'Payments');
+
+        if (!$paymentsNode instanceof DOMElement) {
+            $paymentsNode = $doc->createElementNS(self::NAMESPACE_URI, 'Payments');
+            $queryNode->appendChild($paymentsNode);
+        }
+
+        while ($paymentsNode->firstChild) {
+            $paymentsNode->removeChild($paymentsNode->firstChild);
+        }
+
+        $payment = $doc->createElementNS(self::NAMESPACE_URI, 'Payment');
+        $payment->appendChild($this->createElement($doc, 'Type', 'VP'));
+
+        $method = $doc->createElementNS(self::NAMESPACE_URI, 'Method');
+        $other = $doc->createElementNS(self::NAMESPACE_URI, 'Other');
+        $remarks = $doc->createElementNS(self::NAMESPACE_URI, 'Remarks');
+        $remarks->appendChild($this->createElement($doc, 'Remark', 'TravelNDC demo payment'));
+        $other->appendChild($remarks);
+        $method->appendChild($other);
+        $payment->appendChild($method);
+
+        $amountNode = $doc->createElementNS(self::NAMESPACE_URI, 'Amount', number_format($amount, 2, '.', ''));
+        $amountNode->setAttribute('Code', strtoupper($currency));
+        $payment->appendChild($amountNode);
+
+        $paymentsNode->appendChild($payment);
+    }
+
+    private function parseOrderChangeResponse(string $xmlContent): array
+    {
+        $dom = new DOMDocument();
+
+        if (!@$dom->loadXML($xmlContent)) {
+            throw new TravelNdcException('Unable to parse OrderChange response (invalid XML).');
+        }
+
+        $xpath = new DOMXPath($dom);
+        $namespace = $dom->documentElement?->namespaceURI ?? self::NAMESPACE_URI;
+        $xpath->registerNamespace('ns', $namespace);
+
+        $this->assertNoErrors($xpath);
+
+        $tickets = [];
+        $ticketNodes = $xpath->query('//ns:TicketDocInfo//ns:TicketDocumentNbr');
+
+        if ($ticketNodes) {
+            foreach ($ticketNodes as $ticketNode) {
+                $number = trim($ticketNode->textContent);
+                if ($number !== '') {
+                    $tickets[] = $number;
+                }
+            }
+        }
+
+        return [
+            'tickets' => $tickets,
+            'raw_response' => $xmlContent,
+        ];
+    }
+
+
     private function mapCabinToCode(string $cabinClass): string
     {
         return match (Str::upper($cabinClass)) {
@@ -843,6 +1256,26 @@ class TravelNdcService
         }
 
         return strtoupper($this->config['currency'] ?? 'USD');
+    }
+
+    /**
+     * @param array<int, string> $expressions
+     */
+    private function firstNodeValue(DOMXPath $xpath, array $expressions): ?string
+    {
+        foreach ($expressions as $expression) {
+            $node = $xpath->query($expression)->item(0);
+
+            if ($node instanceof DOMElement) {
+                $value = trim($node->textContent);
+
+                if ($value !== '') {
+                    return $value;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function assertNoErrors(DOMXPath $xpath): void

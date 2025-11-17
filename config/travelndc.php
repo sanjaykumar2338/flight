@@ -70,6 +70,8 @@ $resolveEndpoint = static function (string $key, string $envKey) use ($loader, $
 $templates = [
     'airshopping' => $loader->template('airshopping'),
     'offerprice' => $loader->template('offerprice'),
+    'ordercreate' => $loader->template('ordercreate'),
+    'orderchange' => $loader->template('orderchange'),
 ];
 
 foreach ($templates as $key => $template) {

@@ -7,6 +7,7 @@
         'pending' => 'bg-gray-100 text-gray-700',
     ];
     $badgeClass = $statusClasses[$status] ?? 'bg-gray-100 text-gray-700';
+    $canCollectPayment = in_array($booking->status, ['pending', 'awaiting_payment', 'failed', 'payment_failed'], true);
     $pricing = json_decode($booking->pricing_json ?? '[]', true) ?: [];
     $itinerary = json_decode($booking->itinerary_json ?? '[]', true) ?: [];
     $displayCurrency = $latestTransaction?->currency ?? $booking->currency;
@@ -219,7 +220,7 @@
                 </div>
 
                 <div class="space-y-6">
-                    @if ($status !== 'paid')
+                    @if ($canCollectPayment)
                         <section class="rounded-3xl border border-indigo-200 bg-white p-6 shadow-sm">
                             <h3 class="text-lg font-semibold text-gray-900">Complete Your Payment</h3>
                             <p class="mt-2 text-sm text-gray-600">

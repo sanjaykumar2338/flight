@@ -1,0 +1,600 @@
+{
+	"info": {
+		"_postman_id": "79745bf4-26f3-4c6d-ab3b-a18fd1e275c2",
+		"name": "TravelNDC接口通用格式",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "2460465"
+	},
+	"item": [
+		{
+			"name": "pnr 导入出票流程",
+			"item": [
+				{
+					"name": "pnrImportRQ",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "<OrderRetrieveRQ xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\" Version=\"IATA2017.2\" PrimaryLangID=\"EN\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>xxxxxxxx</Name>\r\n                <IATA_Number>xxxxxxxx</IATA_Number>\r\n                <AgencyID>xxxxxxxx</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>xxxxxxxx</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n        <Recipient>\r\n            <ORA_Recipient>\r\n                <AirlineID>1G</AirlineID>\r\n            </ORA_Recipient>\r\n        </Recipient>\r\n    </Party>\r\n    <Query>\r\n        <Filters>\r\n            <BookingReferences>\r\n                <BookingReference>\r\n                    <!-- pnr -->\r\n                    <ID>xxxxxx</ID>\r\n                    <AirlineID>1G</AirlineID>\r\n                </BookingReference>\r\n            </BookingReferences>\r\n        </Filters>\r\n    </Query>\r\n</OrderRetrieveRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/xxxxxxxx/test/pnrimport",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"xxxxxxxx",
+								"test",
+								"pnrimport"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "pnrRepriceRQ",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "<OrderReshopRQ xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\" Version=\"IATA2017.2\" PrimaryLangID=\"EN\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>xxxxxxxx</Name>\r\n                <IATA_Number>xxxxxxxx</IATA_Number>\r\n                <AgencyID>xxxxxxxx</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>xxxxxxxx</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n        <Recipient>\r\n            <ORA_Recipient>\r\n                <AirlineID>1G</AirlineID>\r\n            </ORA_Recipient>\r\n        </Recipient>\r\n    </Party>\r\n    <Query>\r\n        <!-- pnr -->\r\n        <OrderID>xxxxxx</OrderID>\r\n    </Query>\r\n    <DataLists>\r\n        <PassengerList>\r\n            <Passenger PassengerID=\"ADT5\">\r\n                <PTC>ADT</PTC>\r\n            </Passenger>\r\n        </PassengerList>\r\n    </DataLists>\r\n</OrderReshopRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/xxxxxxxx/test/pnrreprice",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"xxxxxxxx",
+								"test",
+								"pnrreprice"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "pnrChangeRQ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "noauth"
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "<OrderChangeRQ xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\" Version=\"17.2\" PrimaryLangID=\"EN\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>xxxxxxxx</Name>\r\n                <IATA_Number>xxxxxxxx</IATA_Number>\r\n                <AgencyID>xxxxxxxx</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>xxxxxxxx</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n        <Recipient>\r\n            <ORA_Recipient>\r\n                <AirlineID>1G</AirlineID>\r\n            </ORA_Recipient>\r\n        </Recipient>\r\n    </Party>\r\n    <Query>\r\n        <Order>\r\n            <Offer OfferID=\"OFID1\" Owner=\"1G\" ResponseID=\"1190-6caa989a4ea148b18d68f8427ca05c6a\">\r\n                <OfferItem OfferItemID=\"OFITID_1_1\">\r\n                    <PassengerRefs>ADT5</PassengerRefs>\r\n                </OfferItem>\r\n            </Offer>\r\n        </Order>\r\n        <Payments>\r\n            <Payment>\r\n                <Type>VP</Type>\r\n                <Method>\r\n                    <Other>\r\n                        <Remarks>\r\n                            <!-- pnr -->\r\n                            <Remark>xxxxxx</Remark>\r\n                        </Remarks>\r\n                    </Other>\r\n                </Method>\r\n                <Amount Code=\"HKD\">9880</Amount>\r\n            </Payment>\r\n        </Payments>\r\n        <BookingReferences>\r\n            <BookingReference>\r\n                <!-- pnr -->\r\n                <ID>xxxxxx</ID>\r\n                <AirlineID>1G</AirlineID>\r\n            </BookingReference>\r\n        </BookingReferences>\r\n    </Query>\r\n    <DataLists>\r\n        <PassengerList>\r\n            <Passenger PassengerID=\"ADT5\">\r\n                <PTC>ADT</PTC>\r\n                <Birthdate>1993-01-01</Birthdate>\r\n                <Individual>\r\n                    <GivenName>SUNY</GivenName>\r\n                    <Surname>CHANS</Surname>\r\n                </Individual>\r\n                <ContactInfoRef>T1_CONT</ContactInfoRef>\r\n            </Passenger>\r\n        </PassengerList>\r\n        <ContactList>\r\n            <ContactInformation ContactID=\"T1_CONT\">\r\n                <ContactProvided>\r\n                    <EmailAddress>\r\n                        <EmailAddressValue>xxxxxxxx@xx.com</EmailAddressValue>\r\n                    </EmailAddress>\r\n                </ContactProvided>\r\n            </ContactInformation>\r\n        </ContactList>\r\n    </DataLists>\r\n</OrderChangeRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/xxxxxxxx/test/pnrchange",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"xxxxxxxx",
+								"test",
+								"pnrchange"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "预订出票void流程",
+			"item": [
+				{
+					"name": "AirshopingRQ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {},
+								"requests": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "Y2QJT608CFW9AzQ",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "api-test",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\r\n<AirShoppingRQ Version=\"IATA2017.2\" PrimaryLangID=\"ZH\" xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>apitest</Name>\r\n                <IATA_Number>32305733</IATA_Number>\r\n                <AgencyID>APITEST</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>apitest</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n    </Party>\r\n    <CoreQuery>\r\n        <OriginDestinations>\r\n            <OriginDestination>\r\n                <Departure>\r\n                    <AirportCode>SIN</AirportCode>\r\n                    <Date>2025-11-13</Date>\r\n                </Departure>\r\n                <Arrival>\r\n                    <AirportCode>HKG</AirportCode>\r\n                </Arrival>\r\n            </OriginDestination>\r\n            <OriginDestination>\r\n                <Departure>\r\n                    <AirportCode>HKG</AirportCode>\r\n                    <Date>2025-11-13</Date>\r\n                </Departure>\r\n                <Arrival>\r\n                    <AirportCode>BKK</AirportCode>\r\n                </Arrival>\r\n            </OriginDestination>\r\n        </OriginDestinations>\r\n    </CoreQuery>\r\n    <Preference>\r\n        <CabinPreferences>\r\n            <CabinType>\r\n                <Code>5</Code>\r\n            </CabinType>\r\n        </CabinPreferences>\r\n    </Preference>\r\n    <DataLists>\r\n        <PassengerList>\r\n            <Passenger PassengerID=\"T1\">\r\n                <PTC>ADT</PTC>\r\n            </Passenger>\r\n            <Passenger PassengerID=\"T2\">\r\n                <PTC>CHD</PTC>\r\n            </Passenger>\r\n        </PassengerList>\r\n    </DataLists>\r\n</AirShoppingRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/j5ws2ga2uQ/test/airshopping",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"j5ws2ga2uQ",
+								"test",
+								"airshopping"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "OfferPriceRQ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "username",
+									"value": "api-test",
+									"type": "string"
+								},
+								{
+									"key": "password",
+									"value": "Y2QJT608CFW9AzQ",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "<OfferPriceRQ xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\" Version=\"IATA2017.2\" PrimaryLangID=\"EN\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>apitest</Name>\r\n                <IATA_Number>32305733</IATA_Number>\r\n                <AgencyID>APITEST</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>apitest</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n    </Party>\r\n    <Query>\r\n        <Offer OfferID=\"1H0SQZ_VWYSQXQ3DHMEQPYLT7MY0MPEB5AL\" Owner=\"SQ\" ResponseID=\"1752-a2a50d78a75b4a71922015551af6d603\">\r\n            <OfferItem OfferItemID=\"1H0SQZ_VWYSQXQ3DHMEQPYLT7MY0MPEB5AL-1\">\r\n                <PassengerRefs>T1</PassengerRefs>\r\n            </OfferItem>\r\n            <OfferItem OfferItemID=\"1H0SQZ_VWYSQXQ3DHMEQPYLT7MY0MPEB5AL-P2\">\r\n                <PassengerRefs>T2</PassengerRefs>\r\n            </OfferItem>\r\n        </Offer>\r\n    </Query>\r\n    <DataLists>\r\n        <PassengerList>\r\n            <Passenger PassengerID=\"T1\">\r\n                <PTC>ADT</PTC>\r\n            </Passenger>\r\n            <Passenger PassengerID=\"T2\">\r\n                <PTC>ADT</PTC>\r\n            </Passenger>\r\n        </PassengerList>\r\n    </DataLists>\r\n</OfferPriceRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/j5ws2ga2uQ/test/offerprice",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"j5ws2ga2uQ",
+								"test",
+								"offerprice"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "OrderCreateRQ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "xxxxxxxx",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "xxxxxxxx",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "<OrderCreateRQ xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\" Version=\"IATA2017.2\" PrimaryLangID=\"EN\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>xxxxxxxx</Name>\r\n                <IATA_Number>xxxxxxxx</IATA_Number>\r\n                <AgencyID>xxxxxxxx</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>xxxxxxxx</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n        <Recipient>\r\n            <ORA_Recipient>\r\n                <AirlineID>SQ</AirlineID>\r\n            </ORA_Recipient>\r\n        </Recipient>\r\n    </Party>\r\n    <Query>\r\n        <Order>\r\n            <Offer OfferID=\"SP2F-15170427882835151971-1\" Owner=\"SQ\" ResponseID=\"SP2F-15170427882835151971\">\r\n                <OfferItem OfferItemID=\"SP2F-15170427882835151971-1-1\">\r\n                    <PassengerRefs>PAX1 PAX2</PassengerRefs>\r\n                </OfferItem>\r\n                <OfferItem OfferItemID=\"SP2F-15170427882835151971-1-P2\">\r\n                    <PassengerRefs>PAX3</PassengerRefs>\r\n                </OfferItem>\r\n            </Offer>\r\n        </Order>\r\n        <DataLists>\r\n            <PassengerList>\r\n                <Passenger PassengerID=\"PAX1\">\r\n                    <PTC>ADT</PTC>\r\n                    <Birthdate>1988-02-11</Birthdate>\r\n                    <Individual>\r\n                        <Gender>Male</Gender>\r\n                        <NameTitle>Mr</NameTitle>\r\n                        <GivenName>lu</GivenName>\r\n                        <Surname>li</Surname>\r\n                    </Individual>\r\n                    <ContactInfoRef>PAX1_CONT</ContactInfoRef>\r\n                </Passenger>\r\n                <Passenger PassengerID=\"PAX2\">\r\n                    <PTC>ADT</PTC>\r\n                    <Birthdate>1986-07-19</Birthdate>\r\n                    <Individual>\r\n                        <Gender>Male</Gender>\r\n                        <NameTitle>Mr</NameTitle>\r\n                        <GivenName>fang</GivenName>\r\n                        <Surname>zhang</Surname>\r\n                    </Individual>\r\n                </Passenger>\r\n                <Passenger PassengerID=\"PAX3\">\r\n                    <PTC>CHD</PTC>\r\n                    <Birthdate>2018-03-15</Birthdate>\r\n                    <Individual>\r\n                        <Gender>Male</Gender>\r\n                        <NameTitle>Mstr</NameTitle>\r\n                        <GivenName>zi</GivenName>\r\n                        <Surname>qian</Surname>\r\n                    </Individual>\r\n                </Passenger>\r\n            </PassengerList>\r\n            <ContactList>\r\n                <ContactInformation ContactID=\"PAX1_CONT\">\r\n                    <ContactProvided>\r\n                        <EmailAddress>\r\n                            <EmailAddressValue>xxxxxxxx</EmailAddressValue>\r\n                        </EmailAddress>\r\n                    </ContactProvided>\r\n                    <ContactProvided>\r\n                        <Phone>\r\n                            <Label>Mobile</Label>\r\n                            <CountryDialingCode>852</CountryDialingCode>\r\n                            <PhoneNumber>xxxxxxxx</PhoneNumber>\r\n                        </Phone>\r\n                    </ContactProvided>\r\n                </ContactInformation>\r\n            </ContactList>\r\n        </DataLists>\r\n    </Query>\r\n</OrderCreateRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/xxxxxxxx/test/ordercreate",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"xxxxxxxx",
+								"test",
+								"ordercreate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "OrderRetrieveRQ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "xxxxxxxx",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "xxxxxxxx",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "<OrderRetrieveRQ xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\" Version=\"IATA2017.2\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>xxxxxxxx</Name>\r\n                <IATA_Number>xxxxxxxx</IATA_Number>\r\n                <AgencyID>xxxxxxxx</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>xxxxxxxx</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n        <Recipient>\r\n            <ORA_Recipient>\r\n                <AirlineID>SQ</AirlineID>\r\n            </ORA_Recipient>\r\n        </Recipient>\r\n    </Party>\r\n    <Query>\r\n        <Filters>\r\n            <OrderID Owner=\"SQ\">N20230522130xxxxxxxx</OrderID>\r\n        </Filters>\r\n    </Query>\r\n</OrderRetrieveRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/xxxxxxxx/test/orderretrieve",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"xxxxxxxx",
+								"test",
+								"orderretrieve"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "OrderRepriceRQ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "xxxxxxxx",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "xxxxxxxx",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "<OrderReshopRQ xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\" Version=\"17.2\" PrimaryLangID=\"EN\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>xxxxxxxx</Name>\r\n                <IATA_Number>xxxxxxxx</IATA_Number>\r\n                <AgencyID>xxxxxxxx</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>xxxxxxxx</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n        <Recipient>\r\n            <ORA_Recipient>\r\n                <AirlineID>SQ</AirlineID>\r\n            </ORA_Recipient>\r\n        </Recipient>\r\n    </Party>\r\n    <Query>\r\n        <OrderID>N20230522130xxxxxxxx</OrderID>\r\n        <Reshop>\r\n            <OrderServicing>\r\n                <Add>\r\n                    <Qualifier>\r\n                        <ExistingOrderQualifier>\r\n                            <OrderKeys>\r\n                                <OrderID Owner=\"SQ\">N20230522130xxxxxxxx</OrderID>\r\n                            </OrderKeys>\r\n                            <PassengerReferences>PAX2 PAX3 PAX4</PassengerReferences>\r\n                        </ExistingOrderQualifier>\r\n                    </Qualifier>\r\n                </Add>\r\n            </OrderServicing>\r\n        </Reshop>\r\n    </Query>\r\n    <DataLists>\r\n        <PassengerList>\r\n            <Passenger PassengerID=\"PAX2\">\r\n                <PTC>ADT</PTC>\r\n            </Passenger>\r\n            <Passenger PassengerID=\"PAX3\">\r\n                <PTC>ADT</PTC>\r\n            </Passenger>\r\n            <Passenger PassengerID=\"PAX4\">\r\n                <PTC>CHD</PTC>\r\n            </Passenger>\r\n        </PassengerList>\r\n    </DataLists>\r\n</OrderReshopRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/xxxxxxxx/test/orderreshop",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"xxxxxxxx",
+								"test",
+								"orderreshop"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "OrderChangeRQ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "xxxxxxxx",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "xxxxxxxx",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "<OrderChangeRQ xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\" Version=\"17.2\" PrimaryLangID=\"EN\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>xxxxxxxx</Name>\r\n                <IATA_Number>xxxxxxxx</IATA_Number>\r\n                <AgencyID>xxxxxxxx</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>xxxxxxxx</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n        <Recipient>\r\n            <ORA_Recipient>\r\n                <AirlineID>SQ</AirlineID>\r\n            </ORA_Recipient>\r\n        </Recipient>\r\n    </Party>\r\n    <Query>\r\n        <OrderID Owner=\"SQ\">N20230522130xxxxxxxx</OrderID>\r\n        <AcceptRepricedOrder>\r\n            <ResponseID>1262-1e14eafe70884b9eafe5c9805xxxxxxxx</ResponseID>\r\n        </AcceptRepricedOrder>\r\n        <Payments>\r\n            <Payment>\r\n                <Type>VP</Type>\r\n                <Method>\r\n                    <Other>\r\n                        <Remarks>\r\n                            <Remark>订单pnr(6位数)</Remark>\r\n                        </Remarks>\r\n                    </Other>\r\n                </Method>\r\n                <Amount Code=\"CNY\">6068</Amount>\r\n            </Payment>\r\n        </Payments>\r\n    </Query>\r\n    <DataLists>\r\n        <PassengerList>\r\n            <Passenger PassengerID=\"PAX2\">\r\n                <PTC>ADT</PTC>\r\n                <Birthdate>1988-02-11</Birthdate>\r\n                <Individual>\r\n                    <NameTitle>MR</NameTitle>\r\n                    <GivenName>LU</GivenName>\r\n                    <Surname>LI</Surname>\r\n                </Individual>\r\n                <ContactInfoRef>T1_CONT</ContactInfoRef>\r\n            </Passenger>\r\n            <Passenger PassengerID=\"PAX3\">\r\n                <PTC>ADT</PTC>\r\n                <Birthdate>1986-07-19</Birthdate>\r\n                <Individual>\r\n                    <NameTitle>MR</NameTitle>\r\n                    <GivenName>FANG</GivenName>\r\n                    <Surname>ZHANG</Surname>\r\n                </Individual>\r\n            </Passenger>\r\n            <Passenger PassengerID=\"PAX4\">\r\n                <PTC>CHD</PTC>\r\n                <Birthdate>2018-03-15</Birthdate>\r\n                <Individual>\r\n                    <NameTitle>MSTR</NameTitle>\r\n                    <GivenName>ZI</GivenName>\r\n                    <Surname>QIAN</Surname>\r\n                </Individual>\r\n            </Passenger>\r\n        </PassengerList>\r\n        <ContactList>\r\n            <ContactInformation ContactID=\"T1_CONT\">\r\n                <ContactProvided>\r\n                    <EmailAddress>\r\n                        <EmailAddressValue>xxxxxxxx@163.com</EmailAddressValue>\r\n                    </EmailAddress>\r\n                </ContactProvided>\r\n            </ContactInformation>\r\n        </ContactList>\r\n    </DataLists>\r\n</OrderChangeRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/xxxxxxxx/test/orderchange",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"xxxxxxxx",
+								"test",
+								"orderchange"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "OrderCancelRQ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "xxxxxxxx",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "xxxxxxxx",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [
+							{
+								"key": "action",
+								"value": "void",
+								"description": "取消未支付订单，action参数是cancel，已出票订单作废，参数是void，已出票订单Refund，参数是refund",
+								"type": "text"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "<OrderCancelRQ xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\" Version=\"17.2\" PrimaryLangID=\"EN\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>xxxxxxxx</Name>\r\n                <IATA_Number>xxxxxxxx</IATA_Number>\r\n                <AgencyID>xxxxxxxx</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>xxxxxxxx</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n        <Recipient>\r\n            <ORA_Recipient>\r\n                <AirlineID>SQ</AirlineID>\r\n            </ORA_Recipient>\r\n        </Recipient>\r\n    </Party>\r\n    <Query>\r\n        <Order OrderID=\"N20230522130xxxxxxxx\" Owner=\"SQ\"/>\r\n    </Query>\r\n</OrderCancelRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/xxxxxxxx/test/ordercancel",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"xxxxxxxx",
+								"test",
+								"ordercancel"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "OrderRetrieveRQ",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									""
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"auth": {
+							"type": "basic",
+							"basic": [
+								{
+									"key": "password",
+									"value": "xxxxxxxx",
+									"type": "string"
+								},
+								{
+									"key": "username",
+									"value": "xxxxxxxx",
+									"type": "string"
+								}
+							]
+						},
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "<OrderRetrieveRQ xmlns=\"http://www.iata.org/IATA/EDIST/2017.2\" Version=\"IATA2017.2\">\r\n    <Document>\r\n        <Name>TravelNDC</Name>\r\n    </Document>\r\n    <Party>\r\n        <Sender>\r\n            <TravelAgencySender>\r\n                <Name>xxxxxxxx</Name>\r\n                <IATA_Number>xxxxxxxx</IATA_Number>\r\n                <AgencyID>xxxxxxxx</AgencyID>\r\n                <AgentUser>\r\n                    <AgentUserID>xxxxxxxx</AgentUserID>\r\n                </AgentUser>\r\n            </TravelAgencySender>\r\n        </Sender>\r\n        <Recipient>\r\n            <ORA_Recipient>\r\n                <AirlineID>SQ</AirlineID>\r\n            </ORA_Recipient>\r\n        </Recipient>\r\n    </Party>\r\n    <Query>\r\n        <Filters>\r\n            <OrderID Owner=\"SQ\">N20230522130xxxxxxxx</OrderID>\r\n        </Filters>\r\n    </Query>\r\n</OrderRetrieveRQ>",
+							"options": {
+								"raw": {
+									"language": "xml"
+								}
+							}
+						},
+						"url": {
+							"raw": "api.travelndc.cn/api/xxxxxxxx/test/orderretrieve",
+							"host": [
+								"api",
+								"travelndc",
+								"cn"
+							],
+							"path": [
+								"api",
+								"xxxxxxxx",
+								"test",
+								"orderretrieve"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}

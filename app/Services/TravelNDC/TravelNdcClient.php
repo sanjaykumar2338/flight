@@ -9,6 +9,34 @@ use GuzzleHttp\Exception\GuzzleException;
 
 class TravelNdcClient
 {
+    private const DEFAULT_DEMO_RESPONSES = [
+        'orderchange' => <<<XML
+<OrderChangeRS xmlns="http://www.iata.org/IATA/EDIST/2017.2" Version="IATA2017.2" PrimaryLangID="EN">
+    <Document>
+        <Name>TravelNDC Demo</Name>
+        <ReferenceVersion>1.0</ReferenceVersion>
+    </Document>
+    <Success/>
+    <Response>
+        <Order OrderID="ORDER-DEMO-1" Owner="SQ"/>
+        <Payments>
+            <Payment>
+                <Type>CC</Type>
+                <Amount CurrencyCode="USD">500.00</Amount>
+            </Payment>
+        </Payments>
+        <TicketDocInfos>
+            <TicketDocInfo>
+                <TicketDocument>
+                    <TicketDocumentNbr>9991234567890</TicketDocumentNbr>
+                </TicketDocument>
+            </TicketDocInfo>
+        </TicketDocInfos>
+    </Response>
+</OrderChangeRS>
+XML,
+    ];
+
     private Client $client;
 
     /**
@@ -101,6 +129,10 @@ class TravelNdcClient
 
         if (!is_string($response) || trim($response) === '') {
             $response = PostmanCollectionLoader::instance()->response($endpointKey);
+        }
+
+        if (!is_string($response) || trim($response) === '') {
+            $response = self::DEFAULT_DEMO_RESPONSES[$endpointKey] ?? null;
         }
 
         if (!is_string($response) || trim($response) === '') {

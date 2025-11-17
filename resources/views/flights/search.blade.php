@@ -231,156 +231,39 @@
                 </div>
             @endif
 
-            @if (!empty($pricedOffer) && $pricedBooking)
-                @php
-                    $pricing = $pricedOffer['pricing'] ?? [];
-                    $currency = $pricedOffer['currency'] ?? config('travelndc.currency', 'USD');
-                    $ndc = $pricing['ndc'] ?? [];
-                    $baseFare = $ndc['base_amount'] ?? ($pricing['base_amount'] ?? 0);
-                    $taxes = $ndc['tax_amount'] ?? ($pricing['tax_amount'] ?? 0);
-                    $adjustments = $pricing['components']['adjustments'] ?? round(($pricing['payable_total'] ?? 0) - ($baseFare + $taxes), 2);
-                    $rulesApplied = $pricing['rules_applied'] ?? [];
-                    $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
-                    $engineUsed = data_get($pricing, 'engine.used', false);
-                    $legacySource = data_get($pricing, 'legacy.source');
-                @endphp
-                <div id="payment-options" class="rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
-                    <div class="flex flex-col gap-4">
-                        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div>
-                                <p class="font-semibold">Latest Offer Pricing</p>
-                                <p class="text-sm">
-                                    Offer {{ $pricedOffer['offer_id'] }} ({{ $pricedOffer['owner'] }}):
-                                    {{ $currency }} {{ number_format($pricing['payable_total'] ?? 0, 2) }}
-                                </p>
-                                <div class="mt-2 flex flex-wrap gap-2 text-xs text-emerald-800">
-                                    <span class="inline-flex items-center rounded-full bg-white/70 px-2 py-1 font-semibold">
-                                        {{ $engineUsed ? 'Pricing rules applied' : 'Legacy pricing' }}
-                                    </span>
-                                    <span class="inline-flex items-center rounded-full bg-white/70 px-2 py-1 font-semibold">
-                                        {{ $ruleCount }} {{ \Illuminate\Support\Str::plural('adjustment', $ruleCount) }}
-                                    </span>
-                                </div>
-                            </div>
-                            <div class="rounded bg-white px-3 py-2 text-sm font-semibold {{ $adjustments >= 0 ? 'text-emerald-700' : 'text-rose-600' }} shadow-sm">
-                                Adjustments: {{ $adjustments >= 0 ? '+' : '' }}{{ number_format($adjustments, 2) }}
-                            </div>
-                        </div>
-
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
-                                <p class="text-xs uppercase tracking-wide text-gray-500">Fare Summary</p>
-                                <dl class="mt-2 space-y-2 text-sm text-gray-700">
-                                    <div class="flex items-center justify-between">
-                                        <dt>Base fare</dt>
-                                        <dd class="font-semibold">{{ $currency }} {{ number_format($baseFare, 2) }}</dd>
-                                    </div>
-                                    <div class="flex items-center justify-between">
-                                        <dt>Taxes</dt>
-                                        <dd class="font-semibold">{{ $currency }} {{ number_format($taxes, 2) }}</dd>
-                                    </div>
-                                    <div class="flex items-center justify-between {{ $adjustments >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
-                                        <dt>Adjustments</dt>
-                                        <dd class="font-semibold">{{ $adjustments >= 0 ? '+' : '' }}{{ number_format($adjustments, 2) }}</dd>
-                                    </div>
-                                    <div class="flex items-center justify-between font-bold text-indigo-700">
-                                        <dt>Total payable</dt>
-                                        <dd>{{ $currency }} {{ number_format($pricing['payable_total'] ?? 0, 2) }}</dd>
-                                    </div>
-                                </dl>
-                            </div>
-                            <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
-                                <p class="text-xs uppercase tracking-wide text-gray-500">Booking Ref</p>
-                                <p class="text-lg font-semibold text-gray-800">#{{ $pricedBooking->id }}</p>
-                                <p class="mt-1 text-sm text-gray-600">Status: {{ ucfirst($pricedBooking->status) }}</p>
-                                <p class="mt-3 text-xs uppercase tracking-wide text-gray-500">Payment Reference</p>
-                                <p class="text-sm text-gray-700">{{ $pricedBooking->payment_reference ?? '—' }}</p>
-                                <p class="mt-1 text-xs text-gray-500">Total payable: {{ $currency }} {{ number_format($pricing['payable_total'] ?? 0, 2) }}</p>
-                            </div>
-                        </div>
-
-                        <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
-                            <p class="text-xs uppercase tracking-wide text-gray-500">Pricing Breakdown</p>
-                            @if ($ruleCount > 0)
-                                <div class="mt-3 overflow-x-auto">
-                                    <table class="min-w-full divide-y divide-gray-200 text-xs">
-                                        <thead class="bg-gray-50 text-gray-600">
-                                            <tr>
-                                                <th class="px-2 py-2 text-left font-semibold">Rule</th>
-                                                <th class="px-2 py-2 text-left font-semibold">Kind</th>
-                                                <th class="px-2 py-2 text-left font-semibold">Basis</th>
-                                                <th class="px-2 py-2 text-right font-semibold">Impact</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-gray-100">
-                                            @foreach ($rulesApplied as $rule)
-                                                @php
-                                                    $label = $rule['label'] ?? ($rule['id'] ? 'Rule #' . $rule['id'] : 'Adjustment');
-                                                    $details = array_filter([
-                                                        isset($rule['percent']) ? number_format((float) $rule['percent'], 2) . '%' : null,
-                                                        isset($rule['flat_amount']) ? $currency . ' ' . number_format((float) $rule['flat_amount'], 2) : null,
-                                                        isset($rule['fee_percent']) ? number_format((float) $rule['fee_percent'], 2) . '% fee' : null,
-                                                        isset($rule['fixed_fee']) ? $currency . ' ' . number_format((float) $rule['fixed_fee'], 2) : null,
-                                                    ]);
-                                                    $impactAmount = (float) ($rule['impact_amount'] ?? 0);
-                                                @endphp
-                                                <tr>
-                                                    <td class="px-2 py-2">
-                                                        <div class="font-semibold text-gray-800">{{ $label }}</div>
-                                                        @if (!empty($details))
-                                                            <div class="text-[11px] text-gray-500">{{ implode(' · ', $details) }}</div>
-                                                        @endif
-                                                    </td>
-                                                    <td class="px-2 py-2 text-gray-700">{{ $rule['kind'] ?? '—' }}</td>
-                                                    <td class="px-2 py-2 text-gray-700">{{ $rule['basis'] ?? '—' }}</td>
-                                                    <td class="px-2 py-2 text-right font-semibold {{ $impactAmount >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
-                                                        {{ $rule['impact'] ?? ($impactAmount >= 0 ? '+' : '') . number_format($impactAmount, 2) }}
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                            @else
-                                <p class="mt-2 text-sm text-gray-600">No pricing rules matched; legacy defaults were used.</p>
-                            @endif
-                            @if (!$engineUsed && $legacySource)
-                                <p class="mt-2 text-xs text-gray-500">Legacy source: {{ \Illuminate\Support\Str::title($legacySource) }}</p>
-                            @endif
-                        </div>
-
-                        <form method="POST" action="{{ route('checkout.paystack') }}" class="space-y-3">
-                            @csrf
-                            <input type="hidden" name="booking_id" value="{{ $pricedBooking->id }}">
-                            <div>
-                                <x-input-label for="checkout_name" value="Passenger / Contact Name" />
-                                <x-text-input id="checkout_name" name="name" type="text" class="mt-1 block w-full"
-                                    value="{{ old('name', $pricedBooking->customer_name ?? auth()->user()->name ?? '') }}" />
-                            </div>
-                            <div>
-                                <x-input-label for="checkout_email" value="Contact Email" />
-                                <x-text-input id="checkout_email" name="email" type="email" class="mt-1 block w-full"
-                                    value="{{ old('email', $pricedBooking->customer_email ?? auth()->user()->email ?? '') }}" required />
-                                <x-input-error :messages="$errors->get('email')" class="mt-2" />
-                            </div>
-                            <div class="flex items-center gap-3">
-                                <x-primary-button>{{ __('Pay with Paystack') }}</x-primary-button>
-                                <button
-                                    type="button"
-                                    data-stripe-url="{{ route('payments.stripe.checkout', $pricedBooking) }}"
-                                    class="rounded-md border border-indigo-600 bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-                                    data-stripe-button
-                                    data-loading-text="{{ __('Redirecting...') }}"
-                                >
-                                    {{ __('Pay with Stripe') }}
-                                </button>
-                                <x-input-error :messages="$errors->get('checkout')" />
-                                <p data-stripe-error class="text-sm text-red-600"></p>
-                            </div>
-                        </form>
-                    </div>
+            @if ($orderDetails = session('travelNdcOrder'))
+                <div class="rounded border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                    <p class="font-semibold">TravelNDC order created.</p>
+                    <p>Order ID: <span class="font-mono">{{ $orderDetails['order_id'] ?? '—' }}</span></p>
+                    @if (!empty($orderDetails['response_id']))
+                        <p>Response ID: <span class="font-mono">{{ $orderDetails['response_id'] }}</span></p>
+                    @endif
                 </div>
             @endif
+
+            @if ($errors->has('ndc_order'))
+                <div class="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                    {{ $errors->first('ndc_order') }}
+                </div>
+            @endif
+            @if ($errors->has('ndc_payment'))
+                <div class="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+                    {{ $errors->first('ndc_payment') }}
+                </div>
+            @endif
+
+            @if ($tickets = session('travelNdcTickets'))
+                <div class="rounded border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                    <p class="font-semibold">TravelNDC tickets issued.</p>
+                    <ul class="mt-2 list-disc pl-5">
+                        @foreach ($tickets as $ticket)
+                            <li class="font-mono">{{ $ticket }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            
 
             @if ($searchPerformed)
                 @if ($offers->isEmpty())
@@ -388,7 +271,7 @@
                         No flight offers were found for the selected criteria. Try adjusting the dates, airports, or airline filters.
                     </div>
                 @else
-                    <div class="grid gap-6 md:grid-cols-2">
+                    <div class="space-y-6">
                         @foreach ($offers as $offer)
                         @php
                             $tokenPayload = base64_encode(json_encode([
@@ -424,6 +307,12 @@
                                         @endif
                                     </span>
                                 </div>
+                                @php
+                                    $sourceLabel = ($offer['demo_provider'] ?? null) === 'videcom' ? 'Videcom Demo API' : 'TravelNDC API';
+                                @endphp
+                                <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
+                                    {{ $sourceLabel }}
+                                </span>
 
                                 <div class="space-y-2 text-sm text-gray-700">
                                     @forelse ($offer['segments'] as $segment)
@@ -589,6 +478,314 @@
                     Search for flights to see available offers.
                 </div>
             @endif
+
+            @if (!empty($pricedOffer) && !empty($pricedBooking))
+                @php
+                    $pricing = $pricedOffer['pricing'] ?? [];
+                    $currency = $pricedOffer['currency'] ?? config('travelndc.currency', 'USD');
+                    $ndc = $pricing['ndc'] ?? [];
+                    $baseFare = $ndc['base_amount'] ?? ($pricing['base_amount'] ?? 0);
+                    $taxes = $ndc['tax_amount'] ?? ($pricing['tax_amount'] ?? 0);
+                    $components = $pricing['components'] ?? [];
+                    $adjustments = $components['adjustments'] ?? round(($pricing['payable_total'] ?? 0) - ($baseFare + $taxes), 2);
+                    $rulesApplied = $pricing['rules_applied'] ?? [];
+                    $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
+                    $engineUsed = data_get($pricing, 'engine.used', false);
+                    $legacySource = data_get($pricing, 'legacy.source');
+                    $rawOrder = $pricedBooking->provider_order_data ?? [];
+                    $orderData = is_array($rawOrder) ? $rawOrder : [];
+                    $ndcOrderExists = !empty($pricedBooking->provider_order_id);
+                    $ndcTickets = data_get($orderData, 'tickets', []);
+                    $requiresNdcOrder = ($pricedOffer['demo_provider'] ?? null) !== 'videcom';
+                    $disablePayments = $requiresNdcOrder && !$ndcOrderExists;
+                @endphp
+
+                <div id="payment-options" class="rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+                    <div class="flex flex-col gap-4">
+                        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                            <div>
+                                <p class="font-semibold">Latest Offer Pricing</p>
+                                <p class="text-sm">
+                                    Offer {{ $pricedOffer['offer_id'] }} ({{ $pricedOffer['owner'] }}):
+                                    {{ $currency }} {{ number_format($pricing['payable_total'] ?? 0, 2) }}
+                                </p>
+                                <div class="mt-2 flex flex-wrap gap-2 text-xs text-emerald-800">
+                                    <span class="inline-flex items-center rounded-full bg-white/70 px-2 py-1 font-semibold">
+                                        {{ $engineUsed ? 'Pricing rules applied' : 'Legacy pricing' }}
+                                    </span>
+                                    <span class="inline-flex items-center rounded-full bg-white/70 px-2 py-1 font-semibold">
+                                        {{ $ruleCount }} {{ \Illuminate\Support\Str::plural('adjustment', $ruleCount) }}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="rounded bg-white px-3 py-2 text-sm font-semibold {{ $adjustments >= 0 ? 'text-emerald-700' : 'text-rose-600' }} shadow-sm">
+                                Adjustments: {{ $adjustments >= 0 ? '+' : '' }}{{ number_format($adjustments, 2) }}
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
+                                <p class="text-xs uppercase tracking-wide text-gray-500">Fare Summary</p>
+                                <dl class="mt-2 space-y-2 text-sm text-gray-700">
+                                    <div class="flex items-center justify-between">
+                                        <dt>Base fare</dt>
+                                        <dd class="font-semibold">{{ $currency }} {{ number_format($baseFare, 2) }}</dd>
+                                    </div>
+                                    <div class="flex items-center justify-between">
+                                        <dt>Taxes</dt>
+                                        <dd class="font-semibold">{{ $currency }} {{ number_format($taxes, 2) }}</dd>
+                                    </div>
+                                    <div class="flex items-center justify-between {{ $adjustments >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                                        <dt>Adjustments</dt>
+                                        <dd class="font-semibold">{{ $adjustments >= 0 ? '+' : '' }}{{ number_format($adjustments, 2) }}</dd>
+                                    </div>
+                                    <div class="flex items-center justify-between font-bold text-indigo-700">
+                                        <dt>Total payable</dt>
+                                        <dd>{{ $currency }} {{ number_format($pricing['payable_total'] ?? 0, 2) }}</dd>
+                                    </div>
+                                </dl>
+                            </div>
+                            <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
+                                <p class="text-xs uppercase tracking-wide text-gray-500">Booking Ref</p>
+                                <p class="text-lg font-semibold text-gray-800">#{{ $pricedBooking->id }}</p>
+                                <p class="mt-1 text-sm text-gray-600">Status: {{ ucfirst($pricedBooking->status) }}</p>
+                                <p class="mt-3 text-xs uppercase tracking-wide text-gray-500">Payment Reference</p>
+                                <p class="text-sm text-gray-700">{{ $pricedBooking->payment_reference ?? '—' }}</p>
+                                <p class="mt-1 text-xs text-gray-500">Total payable: {{ $currency }} {{ number_format($pricing['payable_total'] ?? 0, 2) }}</p>
+                            </div>
+                        </div>
+
+                        <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
+                            <p class="text-xs uppercase tracking-wide text-gray-500">Pricing Breakdown</p>
+                            @if ($ruleCount > 0)
+                                <div class="mt-3 overflow-x-auto">
+                                    <table class="min-w-full divide-y divide-gray-200 text-xs">
+                                        <thead class="bg-gray-50 text-gray-600">
+                                            <tr>
+                                                <th class="px-2 py-2 text-left font-semibold">Rule</th>
+                                                <th class="px-2 py-2 text-left font-semibold">Kind</th>
+                                                <th class="px-2 py-2 text-left font-semibold">Basis</th>
+                                                <th class="px-2 py-2 text-right font-semibold">Impact</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            @foreach ($rulesApplied as $rule)
+                                                @php
+                                                    $label = $rule['label'] ?? ($rule['id'] ? 'Rule #' . $rule['id'] : 'Adjustment');
+                                                    $details = array_filter([
+                                                        isset($rule['percent']) ? number_format((float) $rule['percent'], 2) . '%' : null,
+                                                        isset($rule['flat_amount']) ? $currency . ' ' . number_format((float) $rule['flat_amount'], 2) : null,
+                                                        isset($rule['fee_percent']) ? number_format((float) $rule['fee_percent'], 2) . '% fee' : null,
+                                                        isset($rule['fixed_fee']) ? $currency . ' ' . number_format((float) $rule['fixed_fee'], 2) : null,
+                                                    ]);
+                                                    $impactAmount = (float) ($rule['impact_amount'] ?? 0);
+                                                @endphp
+                                                <tr>
+                                                    <td class="px-2 py-2">
+                                                        <div class="font-semibold text-gray-800">{{ $label }}</div>
+                                                        @if (!empty($details))
+                                                            <div class="text-[11px] text-gray-500">{{ implode(' · ', $details) }}</div>
+                                                        @endif
+                                                    </td>
+                                                    <td class="px-2 py-2 text-gray-700">{{ $rule['kind'] ?? '—' }}</td>
+                                                    <td class="px-2 py-2 text-gray-700">{{ $rule['basis'] ?? '—' }}</td>
+                                                    <td class="px-2 py-2 text-right font-semibold {{ $impactAmount >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                                                        {{ $rule['impact'] ?? ($impactAmount >= 0 ? '+' : '') . number_format($impactAmount, 2) }}
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            @else
+                                <p class="mt-2 text-sm text-gray-600">No pricing rules matched; legacy defaults were used.</p>
+                            @endif
+
+                            @if (!$engineUsed && $legacySource)
+                                <p class="mt-2 text-xs text-gray-500">Legacy source: {{ \Illuminate\Support\Str::title($legacySource) }}</p>
+                            @endif
+                        </div>
+
+                        @if ($requiresNdcOrder && !empty($pricedOffer['token']))
+                            <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
+                                <p class="text-xs uppercase tracking-wide text-gray-500">TravelNDC Booking</p>
+                                <p class="mt-1 text-sm text-gray-600">
+                                    Provide passenger details to create the TravelNDC order before collecting payment.
+                                </p>
+                                <p class="mt-2 text-sm font-semibold text-emerald-700 {{ $ndcOrderExists ? '' : 'hidden' }}" data-ndc-order-status>
+                                    TravelNDC order created. Order ID:
+                                    <span class="font-mono" data-ndc-order-status-id>{{ $pricedBooking->provider_order_id }}</span>
+                                </p>
+
+                                @if (!$ndcOrderExists)
+                                    <form method="POST" action="{{ route('travelndc.orders.store') }}"
+                                        class="mt-3 space-y-3" data-ndc-order-form>
+                                        @csrf
+                                        <input type="hidden" name="offer_token" value="{{ $pricedOffer['token'] }}">
+                                        <input type="hidden" name="booking_id" value="{{ $pricedBooking->id }}">
+
+                                        <div class="grid gap-3 md:grid-cols-2">
+                                            <div>
+                                                <x-input-label for="ndc_title" value="Title" />
+                                                <select id="ndc_title" name="title"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                                    @foreach (['MR', 'MRS', 'MS'] as $title)
+                                                        <option value="{{ $title }}" @selected(old('title', 'MR') === $title)>
+                                                            {{ $title }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <x-input-label for="ndc_ptc" value="Passenger Type" />
+                                                <select id="ndc_ptc" name="ptc"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                                    @foreach (['ADT' => 'Adult', 'CHD' => 'Child', 'INF' => 'Infant'] as $code => $label)
+                                                        <option value="{{ $code }}" @selected(old('ptc', 'ADT') === $code)>
+                                                            {{ $label }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div class="grid gap-3 md:grid-cols-2">
+                                            <div>
+                                                <x-input-label for="ndc_gender" value="Gender" />
+                                                <select id="ndc_gender" name="gender"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                                    @foreach (['MALE' => 'Male', 'FEMALE' => 'Female'] as $value => $label)
+                                                        <option value="{{ $value }}" @selected(old('gender', 'MALE') === $value)>
+                                                            {{ $label }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <x-input-label for="ndc_birthdate" value="Birthdate" />
+                                                <x-text-input id="ndc_birthdate" name="birthdate" type="date"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('birthdate') }}" />
+                                            </div>
+                                        </div>
+
+                                        <div class="grid gap-3 md:grid-cols-2">
+                                            <div>
+                                                <x-input-label for="ndc_given_name" value="First Name" />
+                                                <x-text-input id="ndc_given_name" name="given_name" type="text"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('given_name', auth()->user()?->name ? explode(' ', auth()->user()->name, 2)[0] : '') }}" />
+                                            </div>
+                                            <div>
+                                                <x-input-label for="ndc_surname" value="Last Name" />
+                                                <x-text-input id="ndc_surname" name="surname" type="text"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('surname') }}" />
+                                            </div>
+                                        </div>
+
+                                        <div class="grid gap-3 md:grid-cols-2">
+                                            <div>
+                                                <x-input-label for="ndc_contact_email" value="Contact Email" />
+                                                <x-text-input id="ndc_contact_email" name="contact_email" type="email"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('contact_email', auth()->user()?->email) }}" />
+                                            </div>
+                                            <div>
+                                                <x-input-label for="ndc_contact_phone" value="Contact Phone" />
+                                                <x-text-input id="ndc_contact_phone" name="contact_phone" type="text"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('contact_phone') }}" placeholder="+123456789" />
+                                            </div>
+                                        </div>
+
+                                        <x-primary-button class="w-full justify-center" data-ndc-order-submit data-loading-text="{{ __('Creating order...') }}">
+                                            {{ __('Create TravelNDC Order') }}
+                                        </x-primary-button>
+                                        <p class="text-sm text-red-600" data-ndc-order-error></p>
+                                    </form>
+                                @endif
+                            </div>
+                        @endif
+
+                        <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm {{ $requiresNdcOrder && !$ndcOrderExists ? 'hidden' : '' }}" data-collect-payment-section>
+                            <p class="text-xs uppercase tracking-wide text-gray-500">Collect Payment</p>
+                            <p class="mb-3 text-sm text-gray-600" data-payment-instruction>
+                                Charge the passenger using Paystack/Stripe. Once the payment succeeds, we will automatically confirm the TravelNDC order and issue tickets.
+                            </p>
+                            <?php if ($disablePayments): ?>
+                                <p class="mb-3 text-sm text-gray-600" data-payment-locked-message>
+                                    Complete the TravelNDC booking form above to enable Paystack/Stripe payment.
+                                </p>
+                            <?php endif; ?>
+                            <form method="POST" action="<?php echo e(route('checkout.paystack')); ?>" class="space-y-3">
+                                <?php echo csrf_field(); ?>
+                                <input type="hidden" name="booking_id" value="<?php echo e($pricedBooking->id); ?>">
+                                <div>
+                                    <label for="checkout_name" class="text-sm font-medium text-gray-700">Passenger / Contact Name</label>
+                                    <input
+                                        id="checkout_name"
+                                        name="name"
+                                        type="text"
+                                        class="mt-1 block w-full rounded-md border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                        value="<?php echo e(old('name', $pricedBooking->customer_name ?? (auth()->user()->name ?? ''))); ?>"
+                                    >
+                                </div>
+                                <div>
+                                    <label for="checkout_email" class="text-sm font-medium text-gray-700">Contact Email</label>
+                                    <input
+                                        id="checkout_email"
+                                        name="email"
+                                        type="email"
+                                        class="mt-1 block w-full rounded-md border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                        value="<?php echo e(old('email', $pricedBooking->customer_email ?? (auth()->user()->email ?? ''))); ?>"
+                                        required
+                                    >
+                                    <?php if($errors->has('email')): ?>
+                                        <div class="mt-2 text-sm text-red-600"><?php echo e($errors->first('email')); ?></div>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <button
+                                        type="submit"
+                                        class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                                        data-payment-button
+                                        <?php echo $disablePayments ? 'disabled' : ''; ?>
+                                    >
+                                        <?php echo e(__('Pay with Paystack')); ?>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        data-stripe-url="<?php echo e(route('payments.stripe.checkout', $pricedBooking)); ?>"
+                                        class="rounded-md border border-indigo-600 bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                                        data-stripe-button
+                                        data-loading-text="<?php echo e(__('Redirecting...')); ?>"
+                                        data-payment-button
+                                        <?php echo $disablePayments ? 'disabled' : ''; ?>
+                                    >
+                                        <?php echo e(__('Pay with Stripe')); ?>
+                                    </button>
+                                    <?php if($errors->has('checkout')): ?>
+                                        <div class="text-sm text-red-600"><?php echo e($errors->first('checkout')); ?></div>
+                                    <?php endif; ?>
+                                    <p data-stripe-error class="text-sm text-red-600"></p>
+                                </div>
+                            </form>
+                        </div>
+
+                        @if (!empty($ndcTickets))
+                            <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
+                                <p class="text-xs uppercase tracking-wide text-gray-500">TravelNDC Tickets</p>
+                                <ul class="mt-2 list-disc pl-5 text-sm text-gray-700">
+                                    @foreach ($ndcTickets as $ticket)
+                                        <li class="font-mono">{{ $ticket }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 
@@ -689,6 +886,194 @@
                 }
             });
         </script>
-        @include('payments.partials.stripe-checkout-script')
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const orderForm = document.querySelector('[data-ndc-order-form]');
+                const statusContainer = document.querySelector('[data-ndc-order-status]');
+                const statusIdTarget = document.querySelector('[data-ndc-order-status-id]');
+                const paymentButtons = document.querySelectorAll('[data-payment-button]');
+                const paymentLockedMessage = document.querySelector('[data-payment-locked-message]');
+                const collectPaymentSection = document.querySelector('[data-collect-payment-section]');
+
+                if (!orderForm || typeof window.fetch !== 'function') {
+                    return;
+                }
+
+                const submitButton = orderForm.querySelector('[data-ndc-order-submit]');
+                const errorContainer = orderForm.querySelector('[data-ndc-order-error]');
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+
+                orderForm.addEventListener('submit', async (event) => {
+                    if (!submitButton) {
+                        return;
+                    }
+
+                    event.preventDefault();
+
+                    const originalText = submitButton.dataset.originalText || submitButton.textContent.trim();
+                    submitButton.dataset.originalText = originalText;
+                    submitButton.disabled = true;
+                    submitButton.textContent = submitButton.dataset.loadingText || 'Processing...';
+
+                    if (errorContainer) {
+                        errorContainer.textContent = '';
+                    }
+
+                    try {
+                        const response = await fetch(orderForm.action, {
+                            method: orderForm.getAttribute('method') || 'POST',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                            },
+                            body: new FormData(orderForm),
+                        });
+
+                        const data = await response.json().catch(() => ({}));
+
+                        if (!response.ok || !data.success) {
+                            const message = data.message || 'Unable to create TravelNDC order. Please try again.';
+                            if (errorContainer) {
+                                errorContainer.textContent = message;
+                            }
+                            return;
+                        }
+
+                        orderForm.classList.add('hidden');
+
+                        if (statusContainer) {
+                            if (data.order_id && statusIdTarget) {
+                                statusIdTarget.textContent = data.order_id;
+                            }
+                            statusContainer.classList.remove('hidden');
+                        }
+
+                        if (collectPaymentSection) {
+                            collectPaymentSection.classList.remove('hidden');
+                        }
+
+                        if (paymentLockedMessage) {
+                            paymentLockedMessage.remove();
+                        }
+
+                        paymentButtons.forEach((button) => {
+                            if (button instanceof HTMLButtonElement) {
+                                button.disabled = false;
+                            }
+                        });
+                    } catch (error) {
+                        if (errorContainer) {
+                            errorContainer.textContent = 'Network error while creating TravelNDC order. Please try again.';
+                        }
+                        console.error('TravelNDC order creation error:', error);
+                    } finally {
+                        submitButton.disabled = false;
+                        submitButton.textContent = submitButton.dataset.originalText || originalText;
+                    }
+                });
+            });
+        </script>
+        <script>
+            (function () {
+                if (window.__stripeCheckoutInitialized) {
+                    return;
+                }
+
+                window.__stripeCheckoutInitialized = true;
+
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') ?? '';
+
+                const bindStripeButtons = () => {
+                    const stripeButtons = document.querySelectorAll('[data-stripe-button]');
+
+                    stripeButtons.forEach((button) => {
+                        if (button.dataset.stripeBound === 'true') {
+                            return;
+                        }
+
+                        button.dataset.stripeBound = 'true';
+
+                        button.addEventListener('click', async (event) => {
+                            if (event.defaultPrevented) {
+                                return;
+                            }
+
+                            const form = button.closest('form');
+
+                            if (!form) {
+                                return;
+                            }
+
+                            event.preventDefault();
+
+                            const errorContainer = form.querySelector('[data-stripe-error]');
+                            const originalLabel = button.dataset.originalText || button.textContent.trim();
+                            const loadingLabel = button.dataset.loadingText || 'Processing...';
+
+                            button.dataset.originalText = originalLabel;
+                            button.disabled = true;
+                            button.textContent = loadingLabel;
+
+                            if (errorContainer) {
+                                errorContainer.textContent = '';
+                            }
+
+                            try {
+                                const targetUrl = button.dataset.stripeUrl || button.getAttribute('formaction') || form.action;
+
+                                if (!targetUrl) {
+                                    throw new Error('Stripe checkout URL is missing.');
+                                }
+
+                                const response = await fetch(targetUrl, {
+                                    method: form.getAttribute('method') || 'POST',
+                                    headers: {
+                                        'X-Requested-With': 'XMLHttpRequest',
+                                        'Accept': 'application/json',
+                                        ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {}),
+                                    },
+                                    credentials: 'same-origin',
+                                    body: new FormData(form),
+                                });
+
+                                const data = await response.json().catch(() => ({}));
+
+                                if (response.ok && data.redirect_url) {
+                                    window.location.href = data.redirect_url;
+                                    return;
+                                }
+
+                                const message =
+                                    (data.errors && data.errors.checkout && data.errors.checkout[0]) ||
+                                    data.message ||
+                                    'Unable to start Stripe checkout. Please try again later.';
+
+                                if (errorContainer) {
+                                    errorContainer.textContent = message;
+                                } else {
+                                    console.error('Stripe checkout error:', message);
+                                }
+                            } catch (error) {
+                                if (errorContainer) {
+                                    errorContainer.textContent = 'Network error while contacting Stripe. Please try again.';
+                                }
+
+                                console.error('Stripe checkout network error:', error);
+                            } finally {
+                                button.disabled = false;
+                                button.textContent = button.dataset.originalText || originalLabel;
+                            }
+                        });
+                    });
+                };
+
+                document.addEventListener('DOMContentLoaded', bindStripeButtons);
+
+                if (document.readyState !== 'loading') {
+                    bindStripeButtons();
+                }
+            })();
+        </script>
     @endpush
 </x-app-layout>

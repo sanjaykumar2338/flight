@@ -24,6 +24,8 @@ class Booking extends Model
         'paid_at',
         'priced_offer_ref',
         'response_id',
+        'provider_order_id',
+        'provider_order_data',
         'primary_carrier',
         'payment_reference',
         'referral_code',
@@ -36,6 +38,7 @@ class Booking extends Model
         'paid_at' => 'datetime',
         'passenger_summary' => 'array',
         'commission_amount' => 'float',
+        'provider_order_data' => 'array',
     ];
 
     public function user(): BelongsTo

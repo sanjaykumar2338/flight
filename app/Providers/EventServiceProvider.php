@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Events\BookingPaid;
+use App\Listeners\AutoTicketTravelNdcOrder;
 use App\Listeners\SendBookingPaidEmail;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Listeners\SendEmailVerificationNotification;
@@ -22,6 +23,7 @@ class EventServiceProvider extends ServiceProvider
         ],
         BookingPaid::class => [
             SendBookingPaidEmail::class,
+            AutoTicketTravelNdcOrder::class,
         ],
     ];
 
