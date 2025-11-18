@@ -1287,15 +1287,31 @@ class TravelNdcService
     {
         $errors = $xpath->query('//ns:Errors/ns:Error | //ns:Error');
 
-        if ($errors && $errors->length > 0) {
-            $messages = [];
+        if (!$errors || $errors->length === 0) {
+            return;
+        }
 
-            foreach ($errors as $error) {
-                $code = $error->attributes?->getNamedItem('Code')?->textContent;
-                $messages[] = trim($error->textContent) . ($code ? " ({$code})" : '');
+        $messages = [];
+
+        foreach ($errors as $error) {
+            $code = $error->attributes?->getNamedItem('Code')?->textContent;
+            $message = trim($error->textContent);
+
+            $isScheduleWarning = $code === '325' || str_contains($message, '(325)');
+
+            if ($isScheduleWarning) {
+                Log::warning('TravelNDC returned no schedules for the requested itinerary.', [
+                    'code' => $code,
+                    'message' => $message,
+                ]);
+                continue;
             }
 
-            throw new TravelNdcException('TravelNDC error: ' . implode('; ', array_filter($messages)));
+            $messages[] = $message . ($code ? " ({$code})" : '');
+        }
+
+        if (!empty($messages)) {
+            throw new TravelNdcException('TravelNDC error: ' . implode('; ', $messages));
         }
     }
 

@@ -6,7 +6,12 @@
     if ($tripType === 'multi_city') {
         $tripType = 'return';
     }
+    $pricedOffer = $pricedOffer ?? null;
+    $pricedBooking = $pricedBooking ?? null;
     $scrollTarget = $scrollTo ?? null;
+    if (!$scrollTarget && !empty($pricedOffer) && !empty($pricedBooking)) {
+        $scrollTarget = 'itinerary-card';
+    }
 @endphp
 
 <x-app-layout>
@@ -60,7 +65,7 @@
                         </button>
                     </div>
 
-                    <div class="grid gap-4 md:grid-cols-[1fr_auto_1fr]">
+                    <div class="grid gap-4 sm:gap-6 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-8">
                         <div data-airport-selector="origin" class="airport-selector">
                             <x-input-label for="origin_search" value="From" />
                             <input type="hidden" id="origin" name="origin" value="{{ old('origin', $search['origin'] ?? '') }}">
@@ -307,13 +312,6 @@
                                         @endif
                                     </span>
                                 </div>
-                                @php
-                                    $sourceLabel = ($offer['demo_provider'] ?? null) === 'videcom' ? 'Videcom Demo API' : 'TravelNDC API';
-                                @endphp
-                                <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">
-                                    {{ $sourceLabel }}
-                                </span>
-
                                 <div class="space-y-2 text-sm text-gray-700">
                                     @forelse ($offer['segments'] as $segment)
                                         <div class="rounded border border-gray-100 bg-gray-50 p-3">
@@ -404,7 +402,7 @@
                                 <input type="hidden" name="offer_token" value="{{ $tokenPayload }}">
                                 <button type="submit"
                                     class="mt-2 w-full rounded-md bg-indigo-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                                    Price This Offer
+                                    Price this offer
                                 </button>
                             </form>
 
@@ -500,6 +498,7 @@
                     $disablePayments = $requiresNdcOrder && !$ndcOrderExists;
                 @endphp
 
+                <div id="itinerary-card" class="sr-only h-0 w-0 overflow-hidden">Itinerary anchor</div>
                 <div id="payment-options" class="rounded border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
                     <div class="flex flex-col gap-4">
                         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
