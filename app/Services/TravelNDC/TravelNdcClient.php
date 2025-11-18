@@ -80,7 +80,6 @@ XML,
 
         $defaultHeaders = [
             'Content-Type' => 'application/xml;charset=UTF-8',
-            'Accept' => 'application/xml',
         ];
 
         $headers = array_merge($defaultHeaders, $headers);
@@ -104,6 +103,10 @@ XML,
 
         if (!str_starts_with($path, 'http://') && !str_starts_with($path, 'https://')) {
             $requestPath = ltrim($path, '/');
+
+            if ($this->client->getConfig('base_uri') === null) {
+                $requestPath = rtrim((string) $this->config['base_url'], '/') . '/' . $requestPath;
+            }
         }
 
         try {

@@ -80,14 +80,24 @@ foreach ($templates as $key => $template) {
     }
 }
 
+$videcomEnabledEnv = env('TRAVELNDC_VIDECOM_ENABLED');
+
+if ($videcomEnabledEnv === null) {
+    $videcomEnabled = $mode === 'demo' && $demoProvider === 'videcom';
+} else {
+    $videcomEnabled = filter_var($videcomEnabledEnv, FILTER_VALIDATE_BOOLEAN);
+}
+
 return [
     'mode' => $mode,
     'demo_provider' => $demoProvider,
+    'videcom_enabled' => $videcomEnabled,
     'base_url' => $baseUrl,
     'client_id' => env('TRAVELNDC_CLIENT_ID'),
     'client_secret' => env('TRAVELNDC_CLIENT_SECRET'),
     'agency_id' => $agencyId,
     'agency_name' => env('TRAVELNDC_AGENCY_NAME'),
+    'iata_number' => env('TRAVELNDC_IATA_NUMBER'),
     'agent_user_id' => env('TRAVELNDC_AGENT_USER_ID'),
     'target_branch' => env('TRAVELNDC_TARGET_BRANCH'),
     'currency' => env('TRAVELNDC_CURRENCY', 'USD'),

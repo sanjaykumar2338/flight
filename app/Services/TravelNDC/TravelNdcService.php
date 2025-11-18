@@ -121,6 +121,7 @@ class TravelNdcService
 
         foreach ($this->generateSearchWindows($searchData, $flexibleDays) as $offset => $payload) {
             $requestXml = $this->buildAirShoppingXml($payload, $airlineFilters);
+            //print($requestXml); die;
             $responseXml = $this->client->post('airshopping', $requestXml);
 
             $parsed = $this->parseAirShoppingResponse($responseXml);
@@ -245,10 +246,7 @@ class TravelNdcService
 
     private function usingVidecomDemo(): bool
     {
-        $mode = strtolower((string) ($this->config['mode'] ?? 'sandbox'));
-        $provider = strtolower((string) ($this->config['demo_provider'] ?? 'postman'));
-
-        return $mode === 'demo' && $provider === 'videcom';
+        return (bool) ($this->config['videcom_enabled'] ?? false);
     }
 
     private function demoProvider(): VidecomDemoProvider
@@ -339,7 +337,7 @@ class TravelNdcService
 
         $this->setChildElementValue($doc, $agencyNode, 'AgencyID', $this->config['agency_id'] ?? null);
         $this->setChildElementValue($doc, $agencyNode, 'Name', $this->config['agency_name'] ?? null);
-        $this->setChildElementValue($doc, $agencyNode, 'IATA_Number', $this->config['target_branch'] ?? null);
+        $this->setChildElementValue($doc, $agencyNode, 'IATA_Number', $this->config['iata_number'] ?? $this->config['target_branch'] ?? null);
 
         $agentUserId = $this->config['agent_user_id'] ?? null;
         $agentUserNode = $this->firstChildElement($agencyNode, 'AgentUser');
@@ -516,11 +514,6 @@ class TravelNdcService
                 $offerItem->appendChild($this->createElement($doc, 'PassengerRefs', implode(' ', $passengerRefs)));
             }
 
-            $segmentRefs = array_filter(array_map('trim', (array) Arr::get($item, 'segment_refs', [])));
-            if (!empty($segmentRefs)) {
-                $offerItem->appendChild($this->createElement($doc, 'SegmentRefs', implode(' ', $segmentRefs)));
-            }
-
             $offerNode->appendChild($offerItem);
         }
     }
@@ -648,6 +641,7 @@ class TravelNdcService
         return $passengers;
     }
 
+
     private function inferPassengerTypeFromReference(string $reference): string
     {
         if (preg_match('/^[A-Z]{3}/', strtoupper($reference), $match)) {
@@ -736,7 +730,8 @@ class TravelNdcService
         $pricingOffers = [];
         $airlines = [];
 
-        $offerNodes = $xpath->query('//ns:AirOffer | //ns:AirlineOffer');
+        $offerNodes = $xpath->query('//ns:AirOffer | //ns:AirlineOffer | //ns:Offer');
+        $globalResponseId = $this->firstNodeValue($xpath, ['//ns:ShoppingResponseID/ns:ResponseID']);
 
         if (!$offerNodes || $offerNodes->count() === 0) {
             return [
@@ -749,7 +744,7 @@ class TravelNdcService
         foreach ($offerNodes as $offerNode) {
             $offerId = trim($offerNode->getAttribute('OfferID') ?: $offerNode->getAttribute('OfferIDRef'));
             $owner = trim($offerNode->getAttribute('Owner') ?: (string) Arr::get($segmentMap, 'default_owner', 'UNKNOWN'));
-            $responseId = trim($offerNode->getAttribute('ResponseID'));
+            $responseId = trim($offerNode->getAttribute('ResponseID') ?: '');
 
             $baseAmount = $this->firstNumeric($xpath, $offerNode, [
                 './/ns:TotalAmount/ns:Service/ns:SimpleCurrencyPrice',
@@ -785,7 +780,7 @@ class TravelNdcService
             $pricingOffers[] = [
                 'offer_id' => $offerId,
                 'owner' => $owner,
-                'response_id' => $responseId !== '' ? $responseId : null,
+                'response_id' => $responseId !== '' ? $responseId : ($globalResponseId ?: null),
                 'currency' => $currency,
                 'pricing' => [
                     'base_amount' => $baseAmount,
@@ -825,18 +820,28 @@ class TravelNdcService
         $total = $this->firstNumeric($xpath, $dom->documentElement, [
             '//ns:PricedOffer/ns:Price/ns:TotalAmount/ns:SimpleCurrencyPrice',
             '//ns:TotalAmount/ns:SimpleCurrencyPrice',
+            '//ns:TotalPrice/ns:DetailCurrencyPrice/ns:Total',
+            '//ns:PricedOffer//ns:TotalPrice/ns:DetailCurrencyPrice/ns:Total',
         ]);
         $currency = $this->firstCurrency($xpath, $dom->documentElement, [
             '//ns:PricedOffer/ns:Price/ns:TotalAmount/ns:SimpleCurrencyPrice',
             '//ns:TotalAmount/ns:SimpleCurrencyPrice',
+            '//ns:TotalPrice/ns:DetailCurrencyPrice/ns:Total',
         ]);
         $base = $this->firstNumeric($xpath, $dom->documentElement, [
             '//ns:PricedOffer/ns:Price/ns:BaseAmount/ns:SimpleCurrencyPrice',
             '//ns:BaseAmount/ns:SimpleCurrencyPrice',
+            '//ns:PricedOffer//ns:OfferItem//ns:Price/ns:BaseAmount/ns:SimpleCurrencyPrice',
+            '//ns:OfferItem//ns:Price/ns:BaseAmount/ns:SimpleCurrencyPrice',
+            '//ns:PricedOffer/ns:Price/ns:BaseAmount',
+            '//ns:PricedOffer//ns:OfferItem//ns:Price/ns:BaseAmount',
+            '//ns:TotalPriceDetail/ns:TotalAmount/ns:SimpleCurrencyPrice',
         ]);
         $tax = $this->firstNumeric($xpath, $dom->documentElement, [
             '//ns:PricedOffer/ns:Price/ns:TaxAmount/ns:SimpleCurrencyPrice',
             '//ns:TaxAmount/ns:SimpleCurrencyPrice',
+            '//ns:TotalPrice/ns:DetailCurrencyPrice/ns:Taxes/ns:Total',
+            '//ns:PricedOffer//ns:OfferItem//ns:Price/ns:Taxes/ns:Total/ns:SimpleCurrencyPrice',
         ]);
 
         return [
@@ -1352,7 +1357,7 @@ class TravelNdcService
 
         /** @var DOMElement $itemNode */
         foreach ($itemNodes as $itemNode) {
-            $passengerRefsRaw = $this->firstText($xpath, $itemNode, ['ns:PassengerRefs']);
+            $passengerRefsRaw = $this->firstText($xpath, $itemNode, ['.//ns:PassengerRefs']);
             $segmentRefs = [];
             $segmentReferenceNodes = $xpath->query('.//ns:SegmentReference', $itemNode);
 
@@ -1366,7 +1371,7 @@ class TravelNdcService
                     }
                 }
             } else {
-                $segmentRefsRaw = $this->firstText($xpath, $itemNode, ['ns:SegmentRefs']);
+                $segmentRefsRaw = $this->firstText($xpath, $itemNode, ['.//ns:SegmentRefs']);
                 $segmentRefs = $this->splitReferences($segmentRefsRaw);
             }
 
