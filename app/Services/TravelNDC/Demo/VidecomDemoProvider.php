@@ -207,10 +207,17 @@ class VidecomDemoProvider
         $segments = array_map(static fn ($leg) => $leg['segment'], $legs);
         $carrier = $segments[0]['marketing_carrier'] ?? ($legs[0]['airline'] ?? 'XX');
         $offerId = $this->buildOfferId($segments);
-        $pricing = $this->mergePricing(array_map(
+        $legsPricing = array_map(
             fn ($leg) => $this->priceForDuration((int) ($leg['duration_minutes'] ?? 0)),
             $legs
-        ));
+        );
+        $pricing = $this->mergePricing($legsPricing);
+        $passengerCount = max(1, count($passengerRefs));
+        $pricing = [
+            'base_amount' => round($pricing['base_amount'] * $passengerCount, 2),
+            'tax_amount' => round($pricing['tax_amount'] * $passengerCount, 2),
+            'total_amount' => round($pricing['total_amount'] * $passengerCount, 2),
+        ];
 
         return [
             'offer_id' => $offerId,
