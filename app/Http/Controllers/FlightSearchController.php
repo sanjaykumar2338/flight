@@ -25,6 +25,7 @@ class FlightSearchController extends Controller
         $offers = collect();
         $availableAirlines = [];
         $errorMessage = null;
+        $currencyFallback = $this->detectCurrency($request);
 
         if ($request->filled('ref')) {
             session(['ref' => trim((string) $request->input('ref'))]);
@@ -125,6 +126,7 @@ class FlightSearchController extends Controller
             'bookingCreated' => $bookingCreated,
             'videcomHold' => $videcomHold,
             'scrollTo' => $scrollTo,
+            'currencyFallback' => $currencyFallback,
         ]);
     }
 
@@ -239,9 +241,42 @@ class FlightSearchController extends Controller
 
     private function detectCurrency(FlightSearchRequest $request): string
     {
-        $countryCode = strtoupper((string) ($request->header('X-Country-Code')
-            ?? $request->server('HTTP_CF_IPCOUNTRY')
-            ?? ''));
+        $ip = $request->ip();
+        $countryCode = null;
+        if ($ip && $this->isPublicIp($ip)) {
+            $cacheKey = "geoip:{$ip}";
+
+            $countryCode = cache()->remember($cacheKey, now()->addMinutes(10), function () use ($ip) {
+                $context = stream_context_create([
+                    'http' => [
+                        'timeout' => 4,
+                        'ignore_errors' => true,
+                    ],
+                ]);
+
+                $response = @file_get_contents("http://ip-api.com/php/{$ip}", false, $context);
+
+                if ($response === false) {
+                    return null;
+                }
+
+                $data = @unserialize($response, ['allowed_classes' => false]);
+
+                if (!is_array($data) || ($data['status'] ?? 'fail') !== 'success') {
+                    return null;
+                }
+
+                return strtoupper((string) ($data['countryCode'] ?? ''));
+            });
+        }
+
+        if ($countryCode === null || $countryCode === '') {
+            $countryCode = strtoupper((string) $request->header('X-Country-Code', ''));
+        }
+
+        if ($countryCode === '') {
+            $countryCode = strtoupper((string) $request->server('HTTP_CF_IPCOUNTRY', ''));
+        }
 
         if ($countryCode === '') {
             if ($this->isNigerianAirport($request->input('origin')) || $this->isNigerianAirport($request->input('destination'))) {
@@ -250,6 +285,11 @@ class FlightSearchController extends Controller
         }
 
         return $countryCode === 'NG' ? 'NGN' : config('travelndc.currency', 'USD');
+    }
+
+    private function isPublicIp(string $ip): bool
+    {
+        return (bool) filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
     }
 
     private function isNigerianAirport(?string $code): bool
