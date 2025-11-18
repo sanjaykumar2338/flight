@@ -1,6 +1,7 @@
 @php
     $search = $searchParams ?? [];
     $selectedAirlines = $selectedAirlines ?? [];
+    $currencyFallback = $currencyFallback ?? config('travelndc.currency', 'USD');
     $tripType = old('trip_type', $search['trip_type'] ?? ($search['return_date'] ? 'return' : 'one_way'));
     $tripType = in_array($tripType, ['return', 'one_way', 'multi_city'], true) ? $tripType : 'return';
     if ($tripType === 'multi_city') {
@@ -289,7 +290,7 @@
                                 'offer_id' => $offer['offer_id'],
                                 'owner' => $offer['owner'],
                                 'response_id' => $offer['response_id'] ?? null,
-                                'currency' => $offer['currency'] ?? config('travelndc.currency', 'USD'),
+                                'currency' => $offer['currency'] ?? $currencyFallback,
                                 'offer_items' => $offer['offer_items'] ?? [],
                                 'segments' => $offer['segments'] ?? [],
                                 'primary_carrier' => $offer['primary_carrier'] ?? $offer['owner'],
@@ -362,7 +363,7 @@
                                 $engineUsed = data_get($pricingData, 'engine.used', false);
                                 $rulesApplied = $pricingData['rules_applied'] ?? [];
                                 $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
-                                $currency = $offer['currency'] ?? config('travelndc.currency', 'USD');
+                                $currency = $offer['currency'] ?? $currencyFallback;
                             @endphp
                             <div class="mt-4 space-y-3 border-t border-gray-100 pt-4 text-sm">
                                 <div class="flex items-center justify-between">
@@ -486,7 +487,7 @@
             @if (!empty($pricedOffer) && !empty($pricedBooking))
                 @php
                     $pricing = $pricedOffer['pricing'] ?? [];
-                    $currency = $pricedOffer['currency'] ?? config('travelndc.currency', 'USD');
+                    $currency = $pricedOffer['currency'] ?? $currencyFallback;
                     $ndc = $pricing['ndc'] ?? [];
                     $baseFare = $ndc['base_amount'] ?? ($pricing['base_amount'] ?? 0);
                     $taxes = $ndc['tax_amount'] ?? ($pricing['tax_amount'] ?? 0);

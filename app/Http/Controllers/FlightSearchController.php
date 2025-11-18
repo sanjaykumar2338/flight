@@ -236,4 +236,33 @@ class FlightSearchController extends Controller
 
         return null;
     }
+
+    private function detectCurrency(FlightSearchRequest $request): string
+    {
+        $countryCode = strtoupper((string) ($request->header('X-Country-Code')
+            ?? $request->server('HTTP_CF_IPCOUNTRY')
+            ?? ''));
+
+        if ($countryCode === '') {
+            if ($this->isNigerianAirport($request->input('origin')) || $this->isNigerianAirport($request->input('destination'))) {
+                $countryCode = 'NG';
+            }
+        }
+
+        return $countryCode === 'NG' ? 'NGN' : config('travelndc.currency', 'USD');
+    }
+
+    private function isNigerianAirport(?string $code): bool
+    {
+        if (!$code) {
+            return false;
+        }
+
+        $nigerianCodes = [
+            'LOS', 'ABV', 'PHC', 'KAN', 'ENU', 'ILR', 'QOW', 'CBQ', 'KAD', 'YOL',
+            'AKR', 'BNI', 'SKO', 'QUO', 'ABB', 'IBA', 'MIU', 'ZAR', 'PHG', 'LOS',
+        ];
+
+        return in_array(strtoupper(trim($code)), $nigerianCodes, true);
+    }
 }
