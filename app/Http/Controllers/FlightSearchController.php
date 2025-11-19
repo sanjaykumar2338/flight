@@ -33,6 +33,17 @@ class FlightSearchController extends Controller
 
         $flexibleDays = $request->flexibleDays();
         $selectedAirlines = $request->airlineFilters();
+        $airlineLookup = collect(config('airlines', []))
+            ->mapWithKeys(fn ($name, $code) => [strtoupper($code) => (string) $name]);
+        $airlineOptions = $airlineLookup
+            ->map(fn ($name, $code) => [
+                'code' => $code,
+                'name' => $name,
+                'label' => sprintf('%s – %s', $code, $name),
+            ])
+            ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
+            ->values()
+            ->all();
 
         if ($request->hasSearchCriteria()) {
             try {
@@ -118,6 +129,8 @@ class FlightSearchController extends Controller
             ],
             'flexibleDays' => $flexibleDays,
             'selectedAirlines' => $selectedAirlines,
+            'airlineOptions' => $airlineOptions,
+            'airlineLookup' => $airlineLookup->all(),
             'availableAirlines' => $availableAirlines,
             'offers' => $offers,
             'errorMessage' => $errorMessage,

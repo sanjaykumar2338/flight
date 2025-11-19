@@ -1,6 +1,33 @@
 @php
     $search = $searchParams ?? [];
     $selectedAirlines = $selectedAirlines ?? [];
+    $airlineLookup = collect($airlineLookup ?? config('airlines', []))
+        ->mapWithKeys(fn ($name, $code) => [strtoupper($code) => (string) $name])
+        ->all();
+    $airlineOptions = collect($airlineOptions ?? [])
+        ->map(function ($option, $key) {
+            $code = strtoupper((string) data_get($option, 'code', is_string($key) ? $key : ''));
+            $name = (string) data_get($option, 'name', '');
+
+            return [
+                'code' => $code,
+                'name' => $name !== '' ? $name : $code,
+            ];
+        })
+        ->filter(fn ($option) => $option['code'] !== '')
+        ->values()
+        ->all();
+
+    if (empty($airlineOptions)) {
+        $airlineOptions = collect($airlineLookup)
+            ->map(fn ($name, $code) => [
+                'code' => $code,
+                'name' => $name,
+            ])
+            ->values()
+            ->all();
+    }
+
     $currencyFallback = $currencyFallback ?? config('travelndc.currency', 'USD');
     $tripType = old('trip_type', $search['trip_type'] ?? ($search['return_date'] ? 'return' : 'one_way'));
     $tripType = in_array($tripType, ['return', 'one_way', 'multi_city'], true) ? $tripType : 'return';
@@ -13,6 +40,21 @@
     if (!$scrollTarget && !empty($pricedOffer) && !empty($pricedBooking)) {
         $scrollTarget = 'itinerary-card';
     }
+    $preselectedAirlines = collect(old('selected_airlines', $selectedAirlines))
+        ->map(fn ($code) => strtoupper((string) $code))
+        ->filter()
+        ->values()
+        ->all();
+    $selectedAirlineSummary = collect($selectedAirlines)
+        ->map(function ($code) use ($airlineLookup) {
+            $upper = strtoupper((string) $code);
+            $name = $airlineLookup[$upper] ?? null;
+
+            return $name ? "{$upper} – {$name}" : $upper;
+        })
+        ->filter()
+        ->values()
+        ->all();
 @endphp
 
 <x-app-layout>
@@ -181,24 +223,37 @@
                         </div>
 
                         <div>
-                            <x-input-label for="selected_airlines" value="Preferred Airlines" />
-                            <x-text-input id="selected_airlines" name="selected_airlines" type="text" class="mt-1 block w-full rounded-lg border-slate-200 focus:border-sky-500 focus:ring-sky-500"
-                                value="{{ old('selected_airlines', implode(',', $selectedAirlines)) }}" placeholder="e.g. SQ, EK" />
-                            <p class="mt-1 text-xs text-gray-500">Comma separated airline codes.</p>
+                            <x-input-label for="selected_airlines_dropdown" value="Preferred Airlines" />
+                            <div id="selected_airlines_dropdown" class="mt-1 airline-checkbox-dropdown" data-control="checkbox-dropdown" data-placeholder="All airlines">
+                                <button type="button" class="dropdown-label">
+                                    {{ empty($preselectedAirlines) ? 'All airlines' : (count($preselectedAirlines) === 1 ? ($preselectedAirlines[0] . ' – ' . ($airlineLookup[$preselectedAirlines[0]] ?? $preselectedAirlines[0])) : count($preselectedAirlines) . ' selected') }}
+                                </button>
+                                <div class="dropdown-list">
+                                    <div class="dropdown-search">
+                                        <input type="text" class="search-input" placeholder="Search airlines...">
+                                    </div>
+                                    <a href="#" data-toggle="check-all" class="dropdown-option dropdown-action text-sky-600">
+                                        Check All
+                                    </a>
+                                    @foreach ($airlineOptions as $option)
+                                        @php
+                                            $code = $option['code'];
+                                            $name = $option['name'];
+                                            $label = "{$code} – {$name}";
+                                        @endphp
+                                        <label class="dropdown-option">
+                                            <input type="checkbox" name="selected_airlines[]" value="{{ $code }}" @checked(in_array($code, $preselectedAirlines, true))>
+                                            <span>{{ $label }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <p class="mt-1 text-xs text-gray-500">Leave blank to include all airlines.</p>
+                            <x-input-error :messages="$errors->get('airlines')" class="mt-2" />
                         </div>
                     </div>
 
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="flex flex-wrap gap-2">
-                            @if (!empty($selectedAirlines))
-                                @foreach ($selectedAirlines as $airline)
-                                    <span class="rounded-full bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
-                                        {{ $airline }}
-                                    </span>
-                                @endforeach
-                            @endif
-                        </div>
-
+                    <div class="flex flex-wrap items-center justify-end gap-3">
                         <div class="flex gap-3">
                             <x-secondary-button type="reset">{{ __('Reset') }}</x-secondary-button>
                             <x-primary-button>
@@ -278,6 +333,18 @@
             
 
             @if ($searchPerformed)
+                <div class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-600">
+                    <span>
+                        @if (!empty($selectedAirlineSummary))
+                            Filtered by airlines: {{ implode(', ', $selectedAirlineSummary) }}
+                        @else
+                            Showing all airlines
+                        @endif
+                    </span>
+                    <span class="text-slate-500">
+                        {{ $offers->count() }} {{ \Illuminate\Support\Str::plural('offer', $offers->count()) }}
+                    </span>
+                </div>
                 @if ($offers->isEmpty())
                     <div class="rounded border border-yellow-200 bg-yellow-50 p-8 text-center text-yellow-900">
                         No flight offers were found for the selected criteria. Try adjusting the dates, airports, or airline filters.
@@ -828,8 +895,225 @@
         </div>
     </div>
 
-    @push('scripts')
-        <script>
+        <style>
+            .airline-checkbox-dropdown {
+                position: relative;
+                font-size: 0.875rem;
+                color: #0f172a;
+            }
+
+            .airline-checkbox-dropdown .dropdown-label {
+                width: 100%;
+                text-align: left;
+                border: 1px solid rgb(226 232 240);
+                border-radius: 0.85rem;
+                padding: 0.65rem 0.85rem;
+                background-color: #fff;
+                appearance: none;
+                -webkit-appearance: none;
+                -moz-appearance: none;
+                font-weight: 600;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 0.5rem;
+                cursor: pointer;
+                box-shadow: inset 0 1px 2px rgb(15 23 42 / 0.05);
+            }
+
+            .airline-checkbox-dropdown .dropdown-label::after {
+                content: "▼";
+                font-size: 0.75rem;
+                color: #475569;
+            }
+
+            .airline-checkbox-dropdown.on .dropdown-label::after {
+                content: "▲";
+            }
+
+            .airline-checkbox-dropdown .dropdown-list {
+                position: absolute;
+                top: calc(100% + 0.5rem);
+                left: 0;
+                right: 0;
+                background-color: #fff;
+                border: 1px solid rgb(226 232 240);
+                border-radius: 1rem;
+                box-shadow: 0 20px 40px rgb(15 23 42 / 0.12);
+                padding: 0.75rem;
+                display: none;
+                max-height: 60vh;
+                overflow-y: auto;
+                z-index: 40;
+            }
+
+            .airline-checkbox-dropdown.on .dropdown-list {
+                display: block;
+            }
+
+            .airline-checkbox-dropdown .dropdown-search {
+                position: sticky;
+                top: 0;
+                background-color: #fff;
+                margin-bottom: 0.5rem;
+                display: none;
+            }
+
+            .airline-checkbox-dropdown .search-input {
+                width: 100%;
+                border: 1px solid rgb(226 232 240);
+                border-radius: 0.65rem;
+                padding: 0.4rem 0.75rem;
+                font-size: 0.85rem;
+                background-color: #fff;
+            }
+
+            .airline-checkbox-dropdown.on .dropdown-search {
+                display: block;
+            }
+
+            .airline-checkbox-dropdown .dropdown-option {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                padding: 0.4rem 0.25rem;
+                border-radius: 0.5rem;
+                transition: background-color 0.15s ease-in-out;
+            }
+
+            .airline-checkbox-dropdown .dropdown-option:hover {
+                background-color: #f1f5f9;
+            }
+
+            .airline-checkbox-dropdown .dropdown-option input[type="checkbox"] {
+                accent-color: #0ea5e9;
+            }
+
+            .airline-checkbox-dropdown .dropdown-option.dropdown-action {
+                font-weight: 600;
+                padding-bottom: 0.75rem;
+            }
+        </style>
+
+    <script>
+            class CheckboxDropdown {
+                constructor(element) {
+                    this.element = element;
+                    this.label = element.querySelector('.dropdown-label');
+                    this.toggleAllButton = element.querySelector('[data-toggle="check-all"]');
+                    this.searchInput = element.querySelector('.search-input');
+                    this.optionLabels = Array.from(element.querySelectorAll('label.dropdown-option'));
+                    this.checkboxes = this.optionLabels.map((label) => label.querySelector('input[type="checkbox"]')).filter(Boolean);
+                    this.placeholder = element.dataset.placeholder || 'All airlines';
+                    this.isOpen = false;
+                    this.areAllChecked = false;
+                    this.handleDocumentClick = this.handleDocumentClick.bind(this);
+                    this.init();
+                }
+
+                init() {
+                    this.updateStatus();
+
+                    if (this.label) {
+                        this.label.addEventListener('click', (event) => {
+                            event.preventDefault();
+                            this.toggleOpen();
+                        });
+                    }
+
+                    if (this.toggleAllButton) {
+                        this.toggleAllButton.addEventListener('click', (event) => {
+                            event.preventDefault();
+                            this.toggleAll();
+                        });
+                    }
+
+                    this.checkboxes.forEach((checkbox) => {
+                        checkbox.addEventListener('change', () => this.updateStatus());
+                    });
+
+                    if (this.searchInput) {
+                        this.searchInput.addEventListener('input', () => this.filterOptions());
+                    }
+                }
+
+                toggleOpen() {
+                    this.isOpen = !this.isOpen;
+                    this.element.classList.toggle('on', this.isOpen);
+
+                    if (this.isOpen) {
+                        document.addEventListener('click', this.handleDocumentClick);
+                    } else {
+                        document.removeEventListener('click', this.handleDocumentClick);
+                    }
+                }
+
+                handleDocumentClick(event) {
+                    if (!this.element.contains(event.target)) {
+                        this.isOpen = false;
+                        this.element.classList.remove('on');
+                        document.removeEventListener('click', this.handleDocumentClick);
+                    }
+                }
+
+                setLabel(text) {
+                    if (this.label) {
+                        this.label.textContent = text;
+                    }
+                }
+
+                updateToggleAllText(text) {
+                    if (this.toggleAllButton) {
+                        this.toggleAllButton.textContent = text;
+                    }
+                }
+
+                updateStatus() {
+                    const checked = this.checkboxes.filter((checkbox) => checkbox.checked);
+                    this.areAllChecked = checked.length > 0 && checked.length === this.checkboxes.length;
+
+                    if (checked.length === 0) {
+                        this.setLabel(this.placeholder);
+                        this.updateToggleAllText('Check All');
+                        return;
+                    }
+
+                    if (checked.length === 1) {
+                        const label = checked[0].closest('label');
+                        const text = label ? label.textContent.trim() : checked[0].value;
+                        this.setLabel(text);
+                    } else if (this.areAllChecked) {
+                        this.setLabel('All Selected');
+                    } else {
+                        this.setLabel(`${checked.length} Selected`);
+                    }
+
+                    this.updateToggleAllText(this.areAllChecked ? 'Uncheck All' : 'Check All');
+                }
+
+                toggleAll(forceCheck = false) {
+                    const targetState = forceCheck || !this.areAllChecked;
+                    this.checkboxes.forEach((checkbox) => {
+                        checkbox.checked = targetState;
+                    });
+                    this.areAllChecked = targetState;
+                    this.updateStatus();
+                }
+
+                filterOptions() {
+                    if (!this.searchInput) {
+                        return;
+                    }
+
+                    const term = this.searchInput.value.trim().toLowerCase();
+
+                    this.optionLabels.forEach((label) => {
+                        const text = label.textContent?.toLowerCase() ?? '';
+                        label.style.display = text.includes(term) ? 'flex' : 'none';
+                    });
+                }
+            }
+
             const scrollTargetId = @json($scrollTarget);
 
             document.addEventListener('DOMContentLoaded', () => {
@@ -923,6 +1207,10 @@
                         }, 2000);
                     }
                 }
+
+                document.querySelectorAll('[data-control="checkbox-dropdown"]').forEach((element) => {
+                    new CheckboxDropdown(element);
+                });
             });
         </script>
         <script>
@@ -1114,5 +1402,4 @@
                 }
             })();
         </script>
-    @endpush
 </x-app-layout>

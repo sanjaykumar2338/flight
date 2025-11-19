@@ -49,9 +49,14 @@ class FlightSearchRequest extends FormRequest
             $this->merge(['destination' => strtoupper(trim($this->input('destination')))]);
         }
 
-        if ($this->filled('selected_airlines')) {
+        if ($this->has('selected_airlines')) {
+            $selected = $this->input('selected_airlines');
+            $selectedValues = is_array($selected)
+                ? $selected
+                : explode(',', (string) $selected);
+
             $this->merge([
-                'airlines' => collect(explode(',', (string) $this->input('selected_airlines')))
+                'airlines' => collect($selectedValues)
                     ->map(fn ($code) => strtoupper(trim((string) $code)))
                     ->filter(fn ($code) => $code !== '')
                     ->unique()
