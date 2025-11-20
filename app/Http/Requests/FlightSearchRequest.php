@@ -6,6 +6,8 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class FlightSearchRequest extends FormRequest
 {
+    public const DEFAULT_FLEXIBLE_DAYS = 3;
+
     public function authorize(): bool
     {
         return true;
@@ -80,7 +82,7 @@ class FlightSearchRequest extends FormRequest
             'adults' => $this->input('adults', 1),
             'children' => $this->input('children', 0),
             'infants' => $this->input('infants', 0),
-            'flexible_days' => $this->input('flexible_days', 0),
+            'flexible_days' => $this->input('flexible_days', self::DEFAULT_FLEXIBLE_DAYS),
             'cabin_class' => strtoupper($this->input('cabin_class', 'ECONOMY')),
         ]);
     }
@@ -92,7 +94,7 @@ class FlightSearchRequest extends FormRequest
 
     public function flexibleDays(): int
     {
-        return (int) $this->input('flexible_days', 0);
+        return (int) $this->input('flexible_days', self::DEFAULT_FLEXIBLE_DAYS);
     }
 
     public function airlineFilters(): array

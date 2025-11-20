@@ -126,6 +126,7 @@ class FlightSearchController extends Controller
                 'children' => $request->input('children', 0),
                 'infants' => $request->input('infants', 0),
                 'cabin_class' => $request->input('cabin_class', 'ECONOMY'),
+                'flexible_days' => $flexibleDays,
             ],
             'flexibleDays' => $flexibleDays,
             'selectedAirlines' => $selectedAirlines,

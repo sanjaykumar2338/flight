@@ -55,6 +55,78 @@
         ->filter()
         ->values()
         ->all();
+    $flexibleDayOptions = [
+        0 => 'Exact date only',
+        1 => '+/- 1 day',
+        2 => '+/- 2 days',
+        3 => 'Standard (+/- 3 days)',
+    ];
+    $flexibleDaysSelected = (int) old(
+        'flexible_days',
+        $search['flexible_days'] ?? ($flexibleDays ?? \App\Http\Requests\FlightSearchRequest::DEFAULT_FLEXIBLE_DAYS)
+    );
+    $flexibleDaysSelected = max(0, min(3, $flexibleDaysSelected));
+    $filterAirlines = collect($airlineOptions ?? config('airlines', []))
+        ->map(function ($option, $key) {
+            $code = strtoupper((string) data_get($option, 'code', is_string($key) ? $key : ''));
+            $label = (string) data_get($option, 'name', $code);
+
+            return [
+                'code' => $code,
+                'label' => $label !== '' ? $label : $code,
+            ];
+        })
+        ->filter(fn ($airline) => $airline['code'] !== '')
+        ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
+        ->values()
+        ->all();
+    $offersCount = isset($offers) && $offers instanceof \Illuminate\Support\Collection ? $offers->count() : 0;
+    $offerStats = [
+        'best' => null,
+        'cheapest' => null,
+        'fastest' => null,
+    ];
+    if ($offersCount > 0) {
+        $statsSource = $offers
+            ->map(function ($offer) use ($currencyFallback) {
+                $pricingData = $offer['pricing'] ?? [];
+                $total = (float) ($pricingData['payable_total'] ?? $pricingData['total_amount'] ?? 0);
+                $currency = $offer['currency'] ?? $currencyFallback;
+
+                return [
+                    'total' => $total,
+                    'currency' => $currency,
+                    'day_offset' => $offer['day_offset'] ?? 0,
+                ];
+            })
+            ->sortBy('total')
+            ->values();
+
+        $best = $statsSource->first();
+        $cheapest = $statsSource->first();
+        $second = $statsSource->get(1);
+
+        $offerStats['best'] = $best ? [
+            'label' => 'Best',
+            'total' => $best['total'],
+            'currency' => $best['currency'],
+            'subtitle' => 'Great balance of price & time',
+        ] : null;
+
+        $offerStats['cheapest'] = $cheapest ? [
+            'label' => 'Cheapest',
+            'total' => $cheapest['total'],
+            'currency' => $cheapest['currency'],
+            'subtitle' => 'Lowest fare available',
+        ] : null;
+
+        $offerStats['fastest'] = $second ? [
+            'label' => 'Next best',
+            'total' => $second['total'],
+            'currency' => $second['currency'],
+            'subtitle' => 'Close alternative',
+        ] : $offerStats['cheapest'];
+    }
 @endphp
 
 <x-app-layout>
@@ -71,198 +143,6 @@
                     Referral code active: <span class="font-semibold">{{ session('ref') }}</span>
                 </div>
             @endif
-
-            <div class="bg-white p-6 shadow-sm sm:rounded-3xl md:p-8">
-                <form method="GET" action="{{ route('flights.search') }}" class="space-y-6" id="flight-search-form">
-                    <input type="hidden" name="trip_type" id="trip_type_input" value="{{ $tripType }}">
-
-                    <div class="space-y-1">
-                        <p class="text-sm font-semibold text-sky-600">Hello there,</p>
-                        <h3 class="text-2xl font-semibold leading-tight text-gray-900">
-                            Book cheap flights with your one-stop travel shop!
-                        </h3>
-                    </div>
-
-                    <div class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 p-1 text-sm font-semibold text-slate-600 shadow-sm">
-                        <button
-                            type="button"
-                            data-trip-type="return"
-                            class="trip-type-btn rounded-full px-5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'return' ? 'bg-black text-white shadow-md border border-black' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
-                        >
-                            Return
-                        </button>
-                        <button
-                            type="button"
-                            data-trip-type="one_way"
-                            class="trip-type-btn rounded-full px-5 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'one_way' ? 'bg-black text-white shadow-md border border-black' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
-                        >
-                            One-way
-                        </button>
-                        <button
-                            type="button"
-                            data-trip-type="multi_city"
-                            disabled
-                            class="trip-type-btn rounded-full border border-transparent bg-white px-5 py-2 text-slate-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
-                            title="Multi-city search is coming soon">
-                            Multi-city
-                        </button>
-                    </div>
-
-                    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:gap-6">
-                        <div class="flex-1" data-airport-selector="origin">
-                            <div class="flex items-center justify-between">
-                                <x-input-label for="origin_search" value="From" />
-                                <button type="button" id="swap_routes"
-                                    class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500 shadow-sm transition hover:text-sky-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 lg:hidden">
-                                    Swap
-                                </button>
-                            </div>
-                            <input type="hidden" id="origin" name="origin" value="{{ old('origin', $search['origin'] ?? '') }}">
-                            <div class="mt-2 flex flex-wrap gap-2" data-airport-selected></div>
-                            <div class="relative mt-2">
-                                <input id="origin_search" type="text" data-airport-search
-                                    class="w-full rounded-lg border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                    placeholder="Search city, country or code" autocomplete="off">
-                                <div
-                                    class="airport-dropdown absolute z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl hidden"
-                                    data-airport-dropdown></div>
-                            </div>
-                            <p class="mt-1 text-xs text-gray-500">Type at least two letters to search.</p>
-                            <x-input-error :messages="$errors->get('origin')" class="mt-2" />
-                        </div>
-                        <div class="hidden items-end justify-center lg:flex">
-                            <button type="button" id="swap_routes"
-                                class="inline-flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:text-sky-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500">
-                                &#8646;
-                            </button>
-                        </div>
-                        <div class="flex-1" data-airport-selector="destination">
-                            <x-input-label for="destination_search" value="To" />
-                            <input type="hidden" id="destination" name="destination" value="{{ old('destination', $search['destination'] ?? '') }}">
-                            <div class="mt-2 flex flex-wrap gap-2" data-airport-selected></div>
-                            <div class="relative mt-2">
-                                <input id="destination_search" type="text" data-airport-search
-                                    class="w-full rounded-lg border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                    placeholder="Search city, country or code" autocomplete="off">
-                                <div
-                                    class="airport-dropdown absolute z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl hidden"
-                                    data-airport-dropdown></div>
-                            </div>
-                            <p class="mt-1 text-xs text-gray-500">Search for any airport worldwide.</p>
-                            <x-input-error :messages="$errors->get('destination')" class="mt-2" />
-                        </div>
-                    </div>
-
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div>
-                            <x-input-label for="departure_date" value="Departure" />
-                            <x-text-input id="departure_date" name="departure_date" type="date" class="mt-1 block w-full"
-                                value="{{ old('departure_date', $search['departure_date'] ?? '') }}" />
-                            <x-input-error :messages="$errors->get('departure_date')" class="mt-2" />
-                        </div>
-                        <div id="return_date_wrapper">
-                            <x-input-label for="return_date" value="Return" />
-                            <x-text-input id="return_date" name="return_date" type="date" class="mt-1 block w-full"
-                                value="{{ old('return_date', $search['return_date'] ?? '') }}" />
-                            <x-input-error :messages="$errors->get('return_date')" class="mt-2" />
-                        </div>
-                    </div>
-
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div>
-                            <x-input-label for="cabin_class" value="Cabin Class" />
-                            <select id="cabin_class" name="cabin_class"
-                                class="mt-1 block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                @foreach (['ECONOMY' => 'Economy', 'PREMIUM_ECONOMY' => 'Premium Economy', 'BUSINESS' => 'Business', 'FIRST' => 'First'] as $value => $label)
-                                    <option value="{{ $value }}" @selected(($search['cabin_class'] ?? 'ECONOMY') === $value)>
-                                        {{ $label }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            <x-input-error :messages="$errors->get('cabin_class')" class="mt-2" />
-                        </div>
-                        <div>
-                            <span class="text-sm font-semibold text-slate-700">Travellers</span>
-                            <div class="mt-2 grid grid-cols-3 gap-3">
-                                <div>
-                                    <x-input-label for="adults" value="Adults" class="text-xs text-slate-500" />
-                                    <x-text-input id="adults" name="adults" type="number" min="1" max="9"
-                                        class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                        value="{{ old('adults', $search['adults'] ?? 1) }}" />
-                                    <x-input-error :messages="$errors->get('adults')" class="mt-2" />
-                                </div>
-                                <div>
-                                    <x-input-label for="children" value="Children" class="text-xs text-slate-500" />
-                                    <x-text-input id="children" name="children" type="number" min="0" max="9"
-                                        class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                        value="{{ old('children', $search['children'] ?? 0) }}" />
-                                    <x-input-error :messages="$errors->get('children')" class="mt-2" />
-                                </div>
-                                <div>
-                                    <x-input-label for="infants" value="Infants" class="text-xs text-slate-500" />
-                                    <x-text-input id="infants" name="infants" type="number" min="0" max="9"
-                                        class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                        value="{{ old('infants', $search['infants'] ?? 0) }}" />
-                                    <x-input-error :messages="$errors->get('infants')" class="mt-2" />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="grid gap-4 md:grid-cols-2">
-                        <div>
-                            <x-input-label for="flexible_days" value="Flexible (+/- days)" />
-                            <select id="flexible_days" name="flexible_days"
-                                class="mt-1 block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                @foreach ([0, 1, 2, 3] as $days)
-                                    <option value="{{ $days }}" @selected(($search['flexible_days'] ?? 0) == $days)>
-                                        {{ $days === 0 ? 'Exact date only' : '+/- ' . $days . ' day(s)' }}
-                                    </option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div>
-                            <x-input-label for="selected_airlines_dropdown" value="Preferred Airlines" />
-                            <div id="selected_airlines_dropdown" class="mt-1 airline-checkbox-dropdown" data-control="checkbox-dropdown" data-placeholder="All airlines">
-                                <button type="button" class="dropdown-label">
-                                    {{ empty($preselectedAirlines) ? 'All airlines' : (count($preselectedAirlines) === 1 ? ($preselectedAirlines[0] . ' – ' . ($airlineLookup[$preselectedAirlines[0]] ?? $preselectedAirlines[0])) : count($preselectedAirlines) . ' selected') }}
-                                </button>
-                                <div class="dropdown-list">
-                                    <div class="dropdown-search">
-                                        <input type="text" class="search-input" placeholder="Search airlines...">
-                                    </div>
-                                    <a href="#" data-toggle="check-all" class="dropdown-option dropdown-action text-sky-600">
-                                        Check All
-                                    </a>
-                                    @foreach ($airlineOptions as $option)
-                                        @php
-                                            $code = $option['code'];
-                                            $name = $option['name'];
-                                            $label = "{$code} – {$name}";
-                                        @endphp
-                                        <label class="dropdown-option">
-                                            <input type="checkbox" name="selected_airlines[]" value="{{ $code }}" @checked(in_array($code, $preselectedAirlines, true))>
-                                            <span>{{ $label }}</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                            </div>
-                            <p class="mt-1 text-xs text-gray-500">Leave blank to include all airlines.</p>
-                            <x-input-error :messages="$errors->get('airlines')" class="mt-2" />
-                        </div>
-                    </div>
-
-                    <div class="flex flex-wrap items-center justify-end gap-3">
-                        <div class="flex gap-3">
-                            <x-secondary-button type="reset">{{ __('Reset') }}</x-secondary-button>
-                            <x-primary-button>
-                                {{ __('Search Flights') }}
-                            </x-primary-button>
-                        </div>
-                    </div>
-                </form>
-            </div>
 
             @if ($errorMessage)
                 <div class="rounded border border-red-200 bg-red-50 p-4 text-sm text-red-800">
@@ -330,155 +210,375 @@
                 </div>
             @endif
 
-            
+            <!-- UPDATED GRID LAYOUT: 30% Left, 40% Right -->
+            <div class="grid gap-6 lg:grid-cols-[30%_40%]">
+                <aside class="lg:sticky lg:top-6">
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <form method="GET" action="{{ route('flights.search') }}" class="space-y-5" id="flight-search-form">
+                            <input type="hidden" name="trip_type" id="trip_type_input" value="{{ $tripType }}">
 
-            @if ($searchPerformed)
-                <div class="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-600">
-                    <span>
-                        @if (!empty($selectedAirlineSummary))
-                            Filtered by airlines: {{ implode(', ', $selectedAirlineSummary) }}
-                        @else
-                            Showing all airlines
-                        @endif
-                    </span>
-                    <span class="text-slate-500">
-                        {{ $offers->count() }} {{ \Illuminate\Support\Str::plural('offer', $offers->count()) }}
-                    </span>
-                </div>
-                @if ($offers->isEmpty())
-                    <div class="rounded border border-yellow-200 bg-yellow-50 p-8 text-center text-yellow-900">
-                        No flight offers were found for the selected criteria. Try adjusting the dates, airports, or airline filters.
-                    </div>
-                @else
-                    <div class="space-y-6">
-                        @foreach ($offers as $offer)
-                        @php
-                            $tokenPayload = base64_encode(json_encode([
-                                'offer_id' => $offer['offer_id'],
-                                'owner' => $offer['owner'],
-                                'response_id' => $offer['response_id'] ?? null,
-                                'currency' => $offer['currency'] ?? $currencyFallback,
-                                'offer_items' => $offer['offer_items'] ?? [],
-                                'segments' => $offer['segments'] ?? [],
-                                'primary_carrier' => $offer['primary_carrier'] ?? $offer['owner'],
-                                'demo_provider' => $offer['demo_provider'] ?? null,
-                                'ndc_pricing' => \Illuminate\Support\Arr::only(
-                                    $offer['ndc_pricing'] ?? ($offer['pricing'] ?? []),
-                                    ['base_amount', 'tax_amount', 'total_amount']
-                                ),
-                                'pricing' => [
-                                    'context' => $offer['pricing_context'] ?? ($offer['pricing']['context'] ?? []),
-                                    'passengers' => $offer['passenger_summary'] ?? ($offer['pricing']['passengers'] ?? []),
-                                ],
-                            ], JSON_UNESCAPED_SLASHES) ?: '');
-                        @endphp
-
-                        <div class="flex h-full flex-col justify-between rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
-                            <div class="space-y-3">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-sm font-medium text-indigo-600">
-                                        {{ $offer['airline_name'] ?? ($offer['primary_carrier'] ?? $offer['owner']) }}
-                                    </span>
-                                    <span class="text-xs uppercase tracking-wide text-gray-500">
-                                        {{ $offer['departure_date'] }}
-                                        @if (!empty($offer['day_offset']))
-                                            ({{ $offer['day_offset'] > 0 ? '+' : '' }}{{ $offer['day_offset'] }} day)
-                                        @endif
-                                    </span>
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Search</p>
+                                    <h3 class="text-lg font-semibold text-slate-900">Find flights</h3>
                                 </div>
-                                <div class="space-y-2 text-sm text-gray-700">
-                                    @forelse ($offer['segments'] as $segment)
-                                        <div class="rounded border border-gray-100 bg-gray-50 p-3">
-                                            <div class="flex items-center justify-between">
-                                                <span class="font-semibold">
-                                                    {{ $segment['origin'] ?? '---' }}
-                                                    →
-                                                    {{ $segment['destination'] ?? '---' }}
-                                                </span>
-                                                <span class="text-xs text-gray-500">
-                                                    {{ $segment['marketing_carrier'] ?? '' }}
-                                                    {{ $segment['marketing_flight_number'] ?? '' }}
-                                                </span>
+                                <button type="reset" class="text-xs font-semibold text-slate-500 hover:text-slate-700">Reset</button>
+                            </div>
+
+                            <div class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 p-1 text-xs font-semibold text-slate-600 shadow-sm">
+                                <button
+                                    type="button"
+                                    data-trip-type="return"
+                                    class="trip-type-btn rounded-full px-4 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'return' ? 'bg-black text-white shadow-md border border-black' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
+                                >
+                                    Return
+                                </button>
+                                <button
+                                    type="button"
+                                    data-trip-type="one_way"
+                                    class="trip-type-btn rounded-full px-4 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'one_way' ? 'bg-black text-white shadow-md border border-black' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
+                                >
+                                    One-way
+                                </button>
+                                <button
+                                    type="button"
+                                    data-trip-type="multi_city"
+                                    disabled
+                                    class="trip-type-btn rounded-full border border-transparent bg-white px-4 py-2 text-slate-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+                                    title="Multi-city search is coming soon">
+                                    Multi-city
+                                </button>
+                            </div>
+
+                            <div class="space-y-4">
+                                <div class="space-y-3" data-airport-selector="origin">
+                                    <div class="flex items-center justify-between">
+                                        <x-input-label for="origin_search" value="From" />
+                                        <button type="button" id="swap_routes"
+                                            class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-500 shadow-sm transition hover:text-sky-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 lg:hidden">
+                                            Swap
+                                        </button>
+                                    </div>
+                                    <input type="hidden" id="origin" name="origin" value="{{ old('origin', $search['origin'] ?? '') }}">
+                                    <div class="flex flex-wrap gap-2" data-airport-selected></div>
+                                    <div class="relative">
+                                        <input id="origin_search" type="text" data-airport-search
+                                            class="w-full rounded-lg border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                            placeholder="Search city, country or code" autocomplete="off">
+                                        <div
+                                            class="airport-dropdown absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl hidden"
+                                            data-airport-dropdown></div>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('origin')" class="mt-1" />
+                                </div>
+
+                                <div class="space-y-3" data-airport-selector="destination">
+                                    <x-input-label for="destination_search" value="To" />
+                                    <input type="hidden" id="destination" name="destination" value="{{ old('destination', $search['destination'] ?? '') }}">
+                                    <div class="flex flex-wrap gap-2" data-airport-selected></div>
+                                    <div class="relative">
+                                        <input id="destination_search" type="text" data-airport-search
+                                            class="w-full rounded-lg border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                            placeholder="Search city, country or code" autocomplete="off">
+                                        <div
+                                            class="airport-dropdown absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl hidden"
+                                            data-airport-dropdown></div>
+                                    </div>
+                                    <x-input-error :messages="$errors->get('destination')" class="mt-1" />
+                                </div>
+
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="departure_date" value="Departure" />
+                                        <x-text-input id="departure_date" name="departure_date" type="date" class="mt-1 block w-full"
+                                            value="{{ old('departure_date', $search['departure_date'] ?? '') }}" />
+                                        <x-input-error :messages="$errors->get('departure_date')" class="mt-1" />
+                                    </div>
+                                    <div id="return_date_wrapper">
+                                        <x-input-label for="return_date" value="Return" />
+                                        <x-text-input id="return_date" name="return_date" type="date" class="mt-1 block w-full"
+                                            value="{{ old('return_date', $search['return_date'] ?? '') }}" />
+                                        <x-input-error :messages="$errors->get('return_date')" class="mt-1" />
+                                    </div>
+                                </div>
+
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <x-input-label for="cabin_class" value="Cabin Class" />
+                                        <select id="cabin_class" name="cabin_class"
+                                            class="mt-1 block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                            @foreach (['ECONOMY' => 'Economy', 'PREMIUM_ECONOMY' => 'Premium Economy', 'BUSINESS' => 'Business', 'FIRST' => 'First'] as $value => $label)
+                                                <option value="{{ $value }}" @selected(($search['cabin_class'] ?? 'ECONOMY') === $value)>
+                                                    {{ $label }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                        <x-input-error :messages="$errors->get('cabin_class')" class="mt-1" />
+                                    </div>
+                                    <div>
+                                        <span class="text-sm font-semibold text-slate-700">Travellers</span>
+                                        <div class="mt-2 grid grid-cols-3 gap-2">
+                                            <div>
+                                                <x-input-label for="adults" value="Adults" class="text-xs text-slate-500" />
+                                                <x-text-input id="adults" name="adults" type="number" min="1" max="9"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('adults', $search['adults'] ?? 1) }}" />
+                                                <x-input-error :messages="$errors->get('adults')" class="mt-1" />
                                             </div>
-                                            <div class="mt-2 grid gap-2 text-xs text-gray-500 md:grid-cols-2">
-                                                <div>
-                                                    Depart:
-                                                    <span class="font-medium text-gray-700">
-                                                        {{ isset($segment['departure']) ? \Carbon\Carbon::parse($segment['departure'])->format('d M Y H:i') : 'N/A' }}
-                                                    </span>
-                                                </div>
-                                                <div>
-                                                    Arrive:
-                                                    <span class="font-medium text-gray-700">
-                                                        {{ isset($segment['arrival']) ? \Carbon\Carbon::parse($segment['arrival'])->format('d M Y H:i') : 'N/A' }}
-                                                    </span>
-                                                </div>
+                                            <div>
+                                                <x-input-label for="children" value="Children" class="text-xs text-slate-500" />
+                                                <x-text-input id="children" name="children" type="number" min="0" max="9"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('children', $search['children'] ?? 0) }}" />
+                                                <x-input-error :messages="$errors->get('children')" class="mt-1" />
+                                            </div>
+                                            <div>
+                                                <x-input-label for="infants" value="Infants" class="text-xs text-slate-500" />
+                                                <x-text-input id="infants" name="infants" type="number" min="0" max="9"
+                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                    value="{{ old('infants', $search['infants'] ?? 0) }}" />
+                                                <x-input-error :messages="$errors->get('infants')" class="mt-1" />
                                             </div>
                                         </div>
-                                    @empty
-                                        <p>No segment information available.</p>
-                                    @endforelse
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <x-input-label for="flexible_days" value="Flexible (+/- days)" />
+                                    <select id="flexible_days" name="flexible_days"
+                                        class="mt-1 block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                        @foreach ($flexibleDayOptions as $days => $label)
+                                            <option value="{{ $days }}" @selected($flexibleDaysSelected === $days)>
+                                                {{ $label }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                </div>
+
+                                <div class="space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                                    <div class="flex items-center justify-between">
+                                        <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                                            <span>Airlines</span>
+                                            <span class="text-xs text-slate-500">{{ empty($preselectedAirlines) ? 'All' : count($preselectedAirlines) . ' selected' }}</span>
+                                        </div>
+                                        <button type="button" data-clear-airline-filters class="text-xs font-semibold text-sky-700 hover:text-sky-800">
+                                            Clear
+                                        </button>
+                                    </div>
+                                    <div class="mt-2">
+                                        <input
+                                            type="text"
+                                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                            placeholder="Search airlines..."
+                                            data-airline-search
+                                        >
+                                    </div>
+                                    <div class="space-y-2 max-h-60 overflow-y-auto pr-1" data-airline-list>
+                                        @forelse ($filterAirlines as $airline)
+                                            <label class="flex items-center gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:border-sky-200 hover:bg-slate-50">
+                                                <input
+                                                    type="checkbox"
+                                                    name="selected_airlines[]"
+                                                    value="{{ $airline['code'] }}"
+                                                    class="h-4 w-4 rounded text-sky-600 focus:ring-sky-500"
+                                                    @checked(in_array($airline['code'], $preselectedAirlines, true))
+                                                >
+                                                <span class="flex-1">
+                                                    <span class="font-semibold text-slate-900">{{ $airline['code'] }}</span>
+                                                    @if ($airline['label'] !== $airline['code'])
+                                                        <span class="ml-1 text-slate-500">– {{ $airline['label'] }}</span>
+                                                    @endif
+                                                </span>
+                                            </label>
+                                        @empty
+                                            <p class="text-sm text-slate-500">No airlines available for this search.</p>
+                                        @endforelse
+                                    </div>
+                                </div>
+
+                                <div class="flex gap-2 pt-1">
+                                    <x-secondary-button type="reset" class="flex-1 justify-center">{{ __('Reset') }}</x-secondary-button>
+                                    <x-primary-button class="flex-1 justify-center">
+                                        {{ __('Search Flights') }}
+                                    </x-primary-button>
                                 </div>
                             </div>
+                        </form>
+                    </div>
+                </aside>
 
-                            @php
-                                $pricingData = $offer['pricing'] ?? [];
-                                $ndc = $pricingData['ndc'] ?? [];
-                                $baseFare = $ndc['base_amount'] ?? ($pricingData['base_amount'] ?? 0);
-                                $taxes = $ndc['tax_amount'] ?? ($pricingData['tax_amount'] ?? 0);
-                                $adjustments = $pricingData['components']['adjustments'] ?? round(($pricingData['payable_total'] ?? 0) - ($baseFare + $taxes), 2);
-                                $engineUsed = data_get($pricingData, 'engine.used', false);
-                                $rulesApplied = $pricingData['rules_applied'] ?? [];
-                                $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
-                                $currency = $offer['currency'] ?? $currencyFallback;
-                            @endphp
-                            <div class="mt-4 space-y-3 border-t border-gray-100 pt-4 text-sm">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-gray-500">Base Fare</span>
-                                    <span class="font-semibold text-gray-900">
-                                        {{ $currency }} {{ number_format($baseFare, 2) }}
-                                    </span>
-                                </div>
-                                <div class="flex items-center justify-between">
-                                    <span class="text-gray-500">Taxes</span>
-                                    <span class="font-semibold text-gray-900">
-                                        {{ $currency }} {{ number_format($taxes, 2) }}
-                                    </span>
-                                </div>
-                                <div class="flex items-center justify-between {{ $adjustments >= 0 ? 'text-emerald-700' : 'text-rose-600' }}">
-                                    <span>Adjustments</span>
-                                    <span class="font-semibold">
-                                        {{ $adjustments >= 0 ? '+' : '' }}{{ number_format($adjustments, 2) }}
-                                    </span>
-                                </div>
-                                <div class="flex items-center justify-between text-lg font-bold text-indigo-700">
-                                    <span>Total Payable</span>
-                                    <span>
-                                        {{ $currency }} {{ number_format($pricingData['payable_total'] ?? 0, 2) }}
-                                    </span>
-                                </div>
-                                <div class="flex items-center justify-between text-xs text-gray-500">
-                                    <span>
-                                        @if ($engineUsed && $ruleCount > 0)
-                                            {{ $ruleCount }} {{ \Illuminate\Support\Str::plural('rule', $ruleCount) }} applied
-                                        @else
-                                            Legacy pricing applied
-                                        @endif
-                                    </span>
-                                    <span>
-                                        {{ $engineUsed ? 'Engine' : ($pricingData['legacy']['source'] ?? 'default') }}
-                                    </span>
-                                </div>
-                            </div>
-
-                            <form method="POST" action="{{ route('offers.price') }}" class="mt-4">
-                                @csrf
-                                <input type="hidden" name="offer_token" value="{{ $tokenPayload }}">
-                                <button type="submit"
-                                    class="mt-2 w-full rounded-md bg-indigo-600 px-4 py-2 text-center text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                                    Select this offer
+                <div class="space-y-4" data-results-anchor>
+                    @if ($searchPerformed)
+                        <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                                    {{ $offersCount }} {{ \Illuminate\Support\Str::plural('result', $offersCount) }} sorted by Best
+                                </span>
+                                <button class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700" type="button">
+                                    Get price alerts
                                 </button>
-                            </form>
+                            </div>
+                            <span class="text-xs text-slate-500">
+                                @if (!empty($selectedAirlineSummary))
+                                    Filtered: {{ implode(', ', $selectedAirlineSummary) }}
+                                @else
+                                    Showing all airlines
+                                @endif
+                            </span>
+                        </div>
+
+                        @if ($offersCount > 0 && $offerStats['best'])
+                            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 shadow-sm md:grid-cols-3">
+                                @foreach (['best', 'cheapest', 'fastest'] as $key)
+                                    @php $stat = $offerStats[$key] ?? null; @endphp
+                                    @if ($stat)
+                                        <div class="rounded-xl border border-slate-200 bg-white/80 px-3 py-3 shadow-sm">
+                                            <p class="text-xs uppercase tracking-wide text-slate-500">{{ $stat['label'] }}</p>
+                                            <p class="text-lg font-bold text-slate-900">{{ $stat['currency'] }} {{ number_format($stat['total'], 2) }}</p>
+                                            <p class="text-[11px] text-slate-500">{{ $stat['subtitle'] }}</p>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
+                        @endif
+
+                        @if ($offers->isEmpty())
+                            <div class="rounded border border-yellow-200 bg-yellow-50 p-8 text-center text-yellow-900">
+                                No flight offers were found for the selected criteria. Try adjusting the dates, airports, or airline filters.
+                            </div>
+                        @else
+                            <div class="space-y-4">
+                                @foreach ($offers as $offer)
+                                @php
+                                    $tokenPayload = base64_encode(json_encode([
+                                        'offer_id' => $offer['offer_id'],
+                                        'owner' => $offer['owner'],
+                                        'response_id' => $offer['response_id'] ?? null,
+                                        'currency' => $offer['currency'] ?? $currencyFallback,
+                                        'offer_items' => $offer['offer_items'] ?? [],
+                                        'segments' => $offer['segments'] ?? [],
+                                        'primary_carrier' => $offer['primary_carrier'] ?? $offer['owner'],
+                                        'demo_provider' => $offer['demo_provider'] ?? null,
+                                        'ndc_pricing' => \Illuminate\Support\Arr::only(
+                                            $offer['ndc_pricing'] ?? ($offer['pricing'] ?? []),
+                                            ['base_amount', 'tax_amount', 'total_amount']
+                                        ),
+                                        'pricing' => [
+                                            'context' => $offer['pricing_context'] ?? ($offer['pricing']['context'] ?? []),
+                                            'passengers' => $offer['passenger_summary'] ?? ($offer['pricing']['passengers'] ?? []),
+                                        ],
+                                    ], JSON_UNESCAPED_SLASHES) ?: '');
+                                @endphp
+
+                                <div class="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        @php
+            $pricingData = $offer['pricing'] ?? [];
+            $ndc = $pricingData['ndc'] ?? [];
+            $baseFare = $ndc['base_amount'] ?? ($pricingData['base_amount'] ?? 0);
+            $taxes = $ndc['tax_amount'] ?? ($pricingData['tax_amount'] ?? 0);
+            $adjustments = $pricingData['components']['adjustments'] ?? round(($pricingData['payable_total'] ?? 0) - ($baseFare + $taxes), 2);
+            $engineUsed = data_get($pricingData, 'engine.used', false);
+            $rulesApplied = $pricingData['rules_applied'] ?? [];
+            $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
+            $currency = $offer['currency'] ?? $currencyFallback;
+        @endphp
+                                            <div class="flex items-center gap-3">
+                                                <div class="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-sm font-semibold text-slate-700">
+                                                    {{ \Illuminate\Support\Str::limit($offer['airline_name'] ?? ($offer['primary_carrier'] ?? $offer['owner']), 2, '') }}
+                                                </div>
+                                                <div>
+                                                    <p class="text-sm font-semibold text-indigo-700">
+                                                        {{ $offer['airline_name'] ?? ($offer['primary_carrier'] ?? $offer['owner']) }}
+                                                    </p>
+                                                    <p class="text-xs text-slate-500">
+                                                        {{ $offer['departure_date'] }}
+                                                        @if (!empty($offer['day_offset']))
+                                                            ({{ $offer['day_offset'] > 0 ? '+' : '' }}{{ $offer['day_offset'] }} day)
+                                                        @endif
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div class="flex items-center gap-3 text-right">
+                                                <div class="text-lg font-bold text-slate-900">
+                                                    {{ $currency }} {{ number_format($pricingData['payable_total'] ?? 0, 2) }}
+                                                </div>
+                                                <div class="text-[11px] text-slate-500">
+                                                    <div>Base: {{ $currency }} {{ number_format($baseFare, 2) }}</div>
+                                                    <div>Taxes: {{ $currency }} {{ number_format($taxes, 2) }}</div>
+                                                </div>
+                                                <form method="POST" action="{{ route('offers.price') }}">
+                                                    @csrf
+                                                    <input type="hidden" name="offer_token" value="{{ $tokenPayload }}">
+                                                    <button type="submit"
+                                                        class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                                        Select →
+                                                    </button>
+                                                </form>
+                                            </div>
+                                    </div>
+
+                                    <div class="grid gap-3 md:grid-cols-[1.2fr,1fr]">
+                                            <div class="space-y-2 text-sm text-gray-700">
+                                                @forelse ($offer['segments'] as $segment)
+                                                    <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                                            <span class="text-sm font-semibold text-slate-800">
+                                                                {{ $segment['origin'] ?? '---' }} → {{ $segment['destination'] ?? '---' }}
+                                                            </span>
+                                                            <span class="text-xs text-gray-500">
+                                                                {{ $segment['marketing_carrier'] ?? '' }}
+                                                                {{ $segment['marketing_flight_number'] ?? '' }}
+                                                            </span>
+                                                        </div>
+                                                        <div class="mt-2 grid gap-3 text-xs text-gray-500 sm:grid-cols-2">
+                                                            <div>
+                                                                Depart:
+                                                                <span class="font-medium text-gray-700">
+                                                                    {{ isset($segment['departure']) ? \Carbon\Carbon::parse($segment['departure'])->format('d M Y H:i') : 'N/A' }}
+                                                                </span>
+                                                            </div>
+                                                            <div>
+                                                                Arrive:
+                                                                <span class="font-medium text-gray-700">
+                                                                    {{ isset($segment['arrival']) ? \Carbon\Carbon::parse($segment['arrival'])->format('d M Y H:i') : 'N/A' }}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                @empty
+                                                    <p class="text-sm text-slate-500">No segment information available.</p>
+                                                @endforelse
+                                            </div>
+
+                                            <div class="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-gray-500">Adjustments</span>
+                                                    <span class="font-semibold {{ $adjustments >= 0 ? 'text-emerald-700' : 'text-rose-600' }}">
+                                                        {{ $adjustments >= 0 ? '+' : '' }}{{ number_format($adjustments, 2) }}
+                                                    </span>
+                                                </div>
+                                                <div class="flex items-center justify-between">
+                                                    <span class="text-gray-500">Pricing</span>
+                                                    <span class="text-xs text-slate-600">
+                                                        {{ $engineUsed && $ruleCount > 0 ? $ruleCount . ' adjustment(s)' : 'Legacy' }}
+                                                    </span>
+                                                </div>
+                                                @if ($rulesApplied)
+                                                    <ul class="mt-2 space-y-1 text-xs text-slate-600">
+                                                        @foreach ($rulesApplied as $rule)
+                                                            @php $impactAmount = (float) ($rule['impact_amount'] ?? 0); @endphp
+                                                            <li class="flex items-center justify-between">
+                                                                <span class="truncate pr-2">{{ $rule['label'] ?? ($rule['id'] ? 'Rule #' . $rule['id'] : 'Adjustment') }}</span>
+                                                                <span class="font-semibold {{ $impactAmount >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
+                                                                    {{ $rule['impact'] ?? ($impactAmount >= 0 ? '+' : '') . number_format($impactAmount, 2) }}
+                                                                </span>
+                                                            </li>
+                                                        @endforeach
+                                                    </ul>
+                                                @endif
+                                            </div>
+                                    </div>
 
                             @if (($offer['demo_provider'] ?? null) === 'videcom')
                                 <div class="mt-5 border-t border-gray-100 pt-4">
@@ -486,58 +586,58 @@
                                     <p class="text-xs text-gray-500">Creates a temporary reservation directly with Videcom.</p>
 
                                     <form method="POST" action="{{ route('offers.hold') }}" class="mt-3 space-y-3">
-                                        @csrf
-                                        <input type="hidden" name="offer_token" value="{{ $tokenPayload }}">
+                                            @csrf
+                                            <input type="hidden" name="offer_token" value="{{ $tokenPayload }}">
 
-                                        <div class="grid gap-3 md:grid-cols-3">
-                                            <div>
-                                                <x-input-label for="passenger_title_{{ $loop->index }}" value="Title" />
-                                                <select id="passenger_title_{{ $loop->index }}" name="passenger_title"
-                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                    @foreach (['MR', 'MRS', 'MS'] as $title)
-                                                        <option value="{{ $title }}" @selected(old('passenger_title', 'MR') === $title)>
-                                                            {{ $title }}
-                                                        </option>
-                                                    @endforeach
-                                                </select>
-                                                <x-input-error :messages="$errors->get('passenger_title')" class="mt-1" />
+                                            <div class="grid gap-3 md:grid-cols-3">
+                                                <div>
+                                                    <x-input-label for="passenger_title_{{ $loop->index }}" value="Title" />
+                                                    <select id="passenger_title_{{ $loop->index }}" name="passenger_title"
+                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                                        @foreach (['MR', 'MRS', 'MS'] as $title)
+                                                            <option value="{{ $title }}" @selected(old('passenger_title', 'MR') === $title)>
+                                                                {{ $title }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                    <x-input-error :messages="$errors->get('passenger_title')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="passenger_first_name_{{ $loop->index }}" value="First Name" />
+                                                    <x-text-input id="passenger_first_name_{{ $loop->index }}" name="passenger_first_name" type="text"
+                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                        value="{{ old('passenger_first_name', auth()->user()?->name ? explode(' ', auth()->user()->name, 2)[0] : '') }}" />
+                                                    <x-input-error :messages="$errors->get('passenger_first_name')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="passenger_last_name_{{ $loop->index }}" value="Last Name" />
+                                                    <x-text-input id="passenger_last_name_{{ $loop->index }}" name="passenger_last_name" type="text"
+                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                        value="{{ old('passenger_last_name') }}" />
+                                                    <x-input-error :messages="$errors->get('passenger_last_name')" class="mt-1" />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <x-input-label for="passenger_first_name_{{ $loop->index }}" value="First Name" />
-                                                <x-text-input id="passenger_first_name_{{ $loop->index }}" name="passenger_first_name" type="text"
-                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                    value="{{ old('passenger_first_name', auth()->user()?->name ? explode(' ', auth()->user()->name, 2)[0] : '') }}" />
-                                                <x-input-error :messages="$errors->get('passenger_first_name')" class="mt-1" />
-                                            </div>
-                                            <div>
-                                                <x-input-label for="passenger_last_name_{{ $loop->index }}" value="Last Name" />
-                                                <x-text-input id="passenger_last_name_{{ $loop->index }}" name="passenger_last_name" type="text"
-                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                    value="{{ old('passenger_last_name') }}" />
-                                                <x-input-error :messages="$errors->get('passenger_last_name')" class="mt-1" />
-                                            </div>
-                                        </div>
 
-                                        <div class="grid gap-3 md:grid-cols-2">
-                                            <div>
-                                                <x-input-label for="contact_email_{{ $loop->index }}" value="Contact Email" />
-                                                <x-text-input id="contact_email_{{ $loop->index }}" name="contact_email" type="email"
-                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                    value="{{ old('contact_email', auth()->user()?->email) }}" />
-                                                <x-input-error :messages="$errors->get('contact_email')" class="mt-1" />
+                                            <div class="grid gap-3 md:grid-cols-2">
+                                                <div>
+                                                    <x-input-label for="contact_email_{{ $loop->index }}" value="Contact Email" />
+                                                    <x-text-input id="contact_email_{{ $loop->index }}" name="contact_email" type="email"
+                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                        value="{{ old('contact_email', auth()->user()?->email) }}" />
+                                                    <x-input-error :messages="$errors->get('contact_email')" class="mt-1" />
+                                                </div>
+                                                <div>
+                                                    <x-input-label for="contact_phone_{{ $loop->index }}" value="Contact Phone" />
+                                                    <x-text-input id="contact_phone_{{ $loop->index }}" name="contact_phone" type="text"
+                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                        value="{{ old('contact_phone') }}" />
+                                                    <x-input-error :messages="$errors->get('contact_phone')" class="mt-1" />
+                                                </div>
                                             </div>
-                                            <div>
-                                                <x-input-label for="contact_phone_{{ $loop->index }}" value="Contact Phone" />
-                                                <x-text-input id="contact_phone_{{ $loop->index }}" name="contact_phone" type="text"
-                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                    value="{{ old('contact_phone') }}" />
-                                                <x-input-error :messages="$errors->get('contact_phone')" class="mt-1" />
-                                            </div>
-                                        </div>
 
-                                        <x-primary-button class="w-full justify-center">
-                                            {{ __('Hold Booking via Videcom') }}
-                                        </x-primary-button>
+                                            <x-primary-button class="w-full justify-center">
+                                                {{ __('Hold Booking via Videcom') }}
+                                            </x-primary-button>
                                     </form>
                                 </div>
                             @endif
@@ -550,6 +650,8 @@
                     Search for flights to see available offers.
                 </div>
             @endif
+                </div>
+            </div>
 
             @if (!empty($pricedOffer) && !empty($pricedBooking))
                 @php
@@ -995,7 +1097,7 @@
             }
         </style>
 
-    <script>
+        <script>
             class CheckboxDropdown {
                 constructor(element) {
                     this.element = element;
@@ -1115,7 +1217,7 @@
             }
 
             const scrollTargetId = @json($scrollTarget);
-
+            const scrollToResults = @json($searchPerformed);
             document.addEventListener('DOMContentLoaded', () => {
                 const tripTypeInput = document.getElementById('trip_type_input');
                 const tripTypeButtons = document.querySelectorAll('.trip-type-btn');
@@ -1206,11 +1308,61 @@
                             target.classList.remove('ring-2', 'ring-emerald-400', 'ring-offset-2');
                         }, 2000);
                     }
+                } else if (scrollToResults) {
+                    const resultsAnchor = document.querySelector('[data-results-anchor]');
+                    if (resultsAnchor) {
+                        resultsAnchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
                 }
 
                 document.querySelectorAll('[data-control="checkbox-dropdown"]').forEach((element) => {
                     new CheckboxDropdown(element);
                 });
+
+                document.querySelectorAll('[data-clear-airline-filters]').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const form = button.closest('form');
+
+                        if (!form) {
+                            return;
+                        }
+
+                        form.querySelectorAll('input[name="selected_airlines[]"]').forEach((checkbox) => {
+                            if (checkbox instanceof HTMLInputElement) {
+                                checkbox.checked = false;
+                            }
+                        });
+
+                        form.submit();
+                    });
+                });
+
+                document.querySelectorAll('[data-airline-search]').forEach((input) => {
+                    const list = input.closest('form')?.querySelector('[data-airline-list]');
+                    if (!list) {
+                        return;
+                    }
+
+                    const items = Array.from(list.querySelectorAll('label')).map((label) => ({
+                        label,
+                        text: (label.textContent || '').trim().toLowerCase(),
+                    }));
+
+                    const render = (term) => {
+                        const normalized = term.trim().toLowerCase();
+                        const matches = normalized === ''
+                            ? items
+                            : items.filter(({ text }) => text.includes(normalized));
+
+                        const sorted = matches.slice().sort((a, b) => a.text.localeCompare(b.text));
+
+                        list.innerHTML = '';
+                        sorted.forEach(({ label }) => list.appendChild(label));
+                    };
+
+                    input.addEventListener('input', () => render(input.value));
+                });
+
             });
         </script>
         <script>
