@@ -55,17 +55,6 @@
         ->filter()
         ->values()
         ->all();
-    $flexibleDayOptions = [
-        0 => 'Exact date only',
-        1 => '+/- 1 day',
-        2 => '+/- 2 days',
-        3 => 'Standard (+/- 3 days)',
-    ];
-    $flexibleDaysSelected = (int) old(
-        'flexible_days',
-        $search['flexible_days'] ?? ($flexibleDays ?? \App\Http\Requests\FlightSearchRequest::DEFAULT_FLEXIBLE_DAYS)
-    );
-    $flexibleDaysSelected = max(0, min(3, $flexibleDaysSelected));
     $filterAirlines = collect($airlineOptions ?? config('airlines', []))
         ->map(function ($option, $key) {
             $code = strtoupper((string) data_get($option, 'code', is_string($key) ? $key : ''));
@@ -212,7 +201,7 @@
 
             <!-- UPDATED GRID LAYOUT: 30% Left, 40% Right -->
             <div class="grid gap-6 lg:grid-cols-[30%_40%]">
-                <aside class="lg:sticky lg:top-6">
+                <aside class="lg:sticky lg:top-6" style="width: 116%;">
                     <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                         <form method="GET" action="{{ route('flights.search') }}" class="space-y-5" id="flight-search-form">
                             <input type="hidden" name="trip_type" id="trip_type_input" value="{{ $tripType }}">
@@ -287,7 +276,7 @@
                                     <x-input-error :messages="$errors->get('destination')" class="mt-1" />
                                 </div>
 
-                                <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="grid gap-3 sm:grid-cols-4">
                                     <div>
                                         <x-input-label for="departure_date" value="Departure" />
                                         <x-text-input id="departure_date" name="departure_date" type="date" class="mt-1 block w-full"
@@ -302,7 +291,7 @@
                                     </div>
                                 </div>
 
-                                <div class="grid gap-3 sm:grid-cols-2">
+                                <div class="grid gap-3 sm:grid-cols-4">
                                     <div>
                                         <x-input-label for="cabin_class" value="Cabin Class" />
                                         <select id="cabin_class" name="cabin_class"
@@ -315,9 +304,11 @@
                                         </select>
                                         <x-input-error :messages="$errors->get('cabin_class')" class="mt-1" />
                                     </div>
+                                </div>
+                                <div class="grid gap-3 sm:grid-cols-4">
                                     <div>
                                         <span class="text-sm font-semibold text-slate-700">Travellers</span>
-                                        <div class="mt-2 grid grid-cols-3 gap-2">
+                                        <div class="mt-2 grid grid-cols-3 gap-4">
                                             <div>
                                                 <x-input-label for="adults" value="Adults" class="text-xs text-slate-500" />
                                                 <x-text-input id="adults" name="adults" type="number" min="1" max="9"
@@ -341,18 +332,6 @@
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-
-                                <div>
-                                    <x-input-label for="flexible_days" value="Flexible (+/- days)" />
-                                    <select id="flexible_days" name="flexible_days"
-                                        class="mt-1 block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                        @foreach ($flexibleDayOptions as $days => $label)
-                                            <option value="{{ $days }}" @selected($flexibleDaysSelected === $days)>
-                                                {{ $label }}
-                                            </option>
-                                        @endforeach
-                                    </select>
                                 </div>
 
                                 <div class="space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
@@ -407,7 +386,46 @@
                     </div>
                 </aside>
 
-                <div class="space-y-4" data-results-anchor>
+                <div class="space-y-4" data-results-anchor style="width: 178%;padding-left: 60px;">
+                    @if ($searchPerformed && isset($dateRangeSummaries) && $dateRangeSummaries->isNotEmpty())
+                        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                            <div class="mb-3 flex items-center justify-between">
+                                <p class="text-sm font-semibold text-slate-800">Flexible dates (±3 days)</p>
+                                <p class="text-xs text-slate-500">Select a range to refresh results</p>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <div class="flex min-w-max gap-3">
+                                    @foreach ($dateRangeSummaries as $summary)
+                                        @php
+                                            $rangeEnd = $summary['end'] ?? $summary['start'];
+                                        @endphp
+                                        <a
+                                            href="{{ $summary['url'] }}"
+                                            class="flex w-48 flex-col rounded-xl border px-4 py-3 transition {{ $summary['is_selected'] ? 'border-indigo-500 bg-indigo-50 text-indigo-900 shadow' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300' }}"
+                                        >
+                                            <span class="text-xs font-semibold uppercase text-slate-500">
+                                                {{ $summary['start']->format('d M') }}
+                                                –
+                                                {{ $rangeEnd->format('d M') }}
+                                            </span>
+                                            <span class="mt-2 text-lg font-bold">
+                                                @if ($summary['price'])
+                                                    {{ $summary['currency'] }} {{ number_format($summary['price'], 2) }}
+                                                @else
+                                                    <span class="text-sm font-semibold text-slate-500">No fares</span>
+                                                @endif
+                                            </span>
+                                            <span class="text-xs text-slate-500">
+                                                {{ $summary['count'] }}
+                                                {{ \Illuminate\Support\Str::plural('offer', $summary['count']) }}
+                                            </span>
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    @endif
+
                     @if ($searchPerformed)
                         <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
                             <div class="flex items-center gap-3">

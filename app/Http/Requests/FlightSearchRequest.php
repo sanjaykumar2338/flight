@@ -28,7 +28,6 @@ class FlightSearchRequest extends FormRequest
             'children' => ['nullable', 'integer', 'min:0', 'max:9'],
             'infants' => ['nullable', 'integer', 'min:0', 'max:9'],
             'cabin_class' => ['required', 'string', 'in:ECONOMY,BUSINESS,PREMIUM_ECONOMY,FIRST'],
-            'flexible_days' => ['nullable', 'integer', 'min:0', 'max:3'],
             'airlines' => ['sometimes', 'array'],
             'airlines.*' => ['string', 'size:2'],
         ];
@@ -82,7 +81,6 @@ class FlightSearchRequest extends FormRequest
             'adults' => $this->input('adults', 1),
             'children' => $this->input('children', 0),
             'infants' => $this->input('infants', 0),
-            'flexible_days' => $this->input('flexible_days', self::DEFAULT_FLEXIBLE_DAYS),
             'cabin_class' => strtoupper($this->input('cabin_class', 'ECONOMY')),
         ]);
     }
@@ -94,7 +92,7 @@ class FlightSearchRequest extends FormRequest
 
     public function flexibleDays(): int
     {
-        return (int) $this->input('flexible_days', self::DEFAULT_FLEXIBLE_DAYS);
+        return self::DEFAULT_FLEXIBLE_DAYS;
     }
 
     public function airlineFilters(): array

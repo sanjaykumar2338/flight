@@ -11,6 +11,7 @@ use App\Models\Booking;
 use Carbon\Carbon;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 
 class FlightSearchController extends Controller
 {
@@ -26,6 +27,8 @@ class FlightSearchController extends Controller
         $availableAirlines = [];
         $errorMessage = null;
         $currencyFallback = $this->detectCurrency($request);
+        $searchData = null;
+        $dateRangeSummaries = collect();
 
         if ($request->filled('ref')) {
             session(['ref' => trim((string) $request->input('ref'))]);
@@ -103,6 +106,14 @@ class FlightSearchController extends Controller
                         return $offer;
                     })
                     ->values();
+
+                $dateRangeSummaries = $this->buildDateRangeSummaries(
+                    $searchData,
+                    $offers,
+                    $flexibleDays,
+                    $request,
+                    $currencyFallback
+                );
             } catch (TravelNdcException $exception) {
                 $errorMessage = $exception->getMessage();
             }
@@ -126,15 +137,14 @@ class FlightSearchController extends Controller
                 'children' => $request->input('children', 0),
                 'infants' => $request->input('infants', 0),
                 'cabin_class' => $request->input('cabin_class', 'ECONOMY'),
-                'flexible_days' => $flexibleDays,
             ],
-            'flexibleDays' => $flexibleDays,
             'selectedAirlines' => $selectedAirlines,
             'airlineOptions' => $airlineOptions,
             'airlineLookup' => $airlineLookup->all(),
             'availableAirlines' => $availableAirlines,
             'offers' => $offers,
             'errorMessage' => $errorMessage,
+            'dateRangeSummaries' => $dateRangeSummaries,
             'pricedOffer' => $pricedOffer,
             'pricedBooking' => $pricedBooking,
             'bookingCreated' => $bookingCreated,
@@ -142,6 +152,62 @@ class FlightSearchController extends Controller
             'scrollTo' => $scrollTo,
             'currencyFallback' => $currencyFallback,
         ]);
+    }
+
+    /**
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    private function buildDateRangeSummaries(
+        FlightSearchData $searchData,
+        Collection $offers,
+        int $flexibleDays,
+        FlightSearchRequest $request,
+        string $currencyFallback
+    ): Collection {
+        $baseDeparture = $searchData->departureDate->copy();
+        $baseReturn = $searchData->returnDate?->copy();
+        $queryBase = collect($request->query())
+            ->except(['departure_date', 'return_date', 'page'])
+            ->all();
+
+        return collect(range(-$flexibleDays, $flexibleDays))
+            ->map(function (int $offset) use ($baseDeparture, $baseReturn, $offers, $queryBase) {
+                $start = $baseDeparture->copy()->addDays($offset);
+                $end = $baseReturn ? $baseReturn->copy()->addDays($offset) : null;
+
+                $matching = $offers->filter(fn ($offer) => (int) ($offer['day_offset'] ?? 0) === $offset);
+                $price = $matching
+                    ->map(fn ($offer) => (float) Arr::get($offer, 'pricing.payable_total', Arr::get($offer, 'pricing.total_amount', 0)))
+                    ->filter(fn ($amount) => $amount > 0)
+                    ->sort()
+                    ->first();
+                $currency = $matching
+                    ->map(fn ($offer) => Arr::get($offer, 'pricing.currency'))
+                    ->filter()
+                    ->first() ?? $currencyFallback;
+
+                $query = array_merge($queryBase, [
+                    'departure_date' => $start->toDateString(),
+                ]);
+
+                if ($end) {
+                    $query['return_date'] = $end->toDateString();
+                } else {
+                    $query['return_date'] = null;
+                }
+
+                return [
+                    'offset' => $offset,
+                    'start' => $start,
+                    'end' => $end,
+                    'price' => $price,
+                    'currency' => $currency,
+                    'count' => $matching->count(),
+                    'url' => route('flights.search', array_filter($query, fn ($value) => $value !== null && $value !== '')),
+                    'is_selected' => $offset === 0,
+                ];
+            })
+            ->values();
     }
 
     private function buildPassengerSummary(FlightSearchData $searchData): array
