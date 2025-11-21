@@ -125,6 +125,153 @@
         </h2>
     </x-slot>
 
+    <div class="mt-4 border-b border-slate-200 bg-white">
+        <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
+            <form method="GET" action="<?= route('flights.search') ?>" id="flight-search-form" class="space-y-4">
+            <input type="hidden" name="trip_type" id="trip_type_input" value="<?= htmlspecialchars($tripType) ?>">
+            <div class="flex flex-wrap items-end gap-4 pb-4 border-b border-slate-100">
+        
+        <div>
+            <label class="block text-xs font-medium text-slate-500 mb-1">Trip Type</label>
+            <div class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 p-1 text-xs font-semibold text-slate-600 shadow-sm">
+                <button
+                    type="button"
+                    data-trip-type="return"
+                    class="trip-type-btn rounded-full px-3 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 <?= $tripType === 'return' ? 'bg-black text-white shadow-md border border-black' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' ?>"
+                >
+                    Return
+                </button>
+                <button
+                    type="button"
+                    data-trip-type="one_way"
+                    class="trip-type-btn rounded-full px-3 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 <?= $tripType === 'one_way' ? 'bg-black text-white shadow-md border border-black' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' ?>"
+                >
+                    One-way
+                </button>
+                <button
+                    type="button"
+                    data-trip-type="multi_city"
+                    disabled
+                    class="trip-type-btn rounded-full border border-transparent bg-white px-3 py-2 text-slate-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
+                    title="Multi-city search is coming soon">
+                    Multi-city
+                </button>
+            </div>
+        </div>
+
+        <div class="flex-1 min-w-[200px]" data-airport-selector="origin">
+            <div class="flex items-center justify-between mb-1">
+                <label for="origin_search" class="block text-sm font-medium text-gray-700">From</label>
+                <button type="button" id="swap_routes"
+                    class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold text-slate-500 shadow-sm transition hover:text-sky-600 lg:hidden">
+                    Swap
+                </button>
+            </div>
+            <input type="hidden" id="origin" name="origin" value="<?= htmlspecialchars(old('origin', $search['origin'] ?? '')) ?>">
+            <div class="flex flex-wrap gap-2" data-airport-selected></div>
+            <div class="relative">
+                <input id="origin_search" type="text" data-airport-search
+                    class="block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                    placeholder="Search city, country or code" autocomplete="off">
+                <div
+                    class="airport-dropdown absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl hidden"
+                    data-airport-dropdown></div>
+            </div>
+            <?php if($errors->has('origin')): ?>
+                <p class="mt-1 text-sm text-red-600"><?= $errors->first('origin') ?></p>
+            <?php endif; ?>
+        </div>
+
+        <div class="flex-1 min-w-[200px]" data-airport-selector="destination">
+            <label for="destination_search" class="block text-sm font-medium text-gray-700 mb-1">To</label>
+            <input type="hidden" id="destination" name="destination" value="<?= htmlspecialchars(old('destination', $search['destination'] ?? '')) ?>">
+            <div class="flex flex-wrap gap-2" data-airport-selected></div>
+            <div class="relative">
+                <input id="destination_search" type="text" data-airport-search
+                    class="block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                    placeholder="Search city, country or code" autocomplete="off">
+                <div
+                    class="airport-dropdown absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl hidden"
+                    data-airport-dropdown></div>
+            </div>
+            <?php if($errors->has('destination')): ?>
+                <p class="mt-1 text-sm text-red-600"><?= $errors->first('destination') ?></p>
+            <?php endif; ?>
+        </div>
+    </div>
+
+    <div class="flex flex-wrap items-end gap-4">
+        
+        <div>
+            <label for="departure_date" class="block text-sm font-medium text-gray-700 mb-1">Departure</label>
+            <input id="departure_date" name="departure_date" type="date" class="block w-40 rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                value="<?= htmlspecialchars(old('departure_date', $search['departure_date'] ?? '')) ?>" />
+            <?php if($errors->has('departure_date')): ?>
+                <p class="mt-1 text-sm text-red-600"><?= $errors->first('departure_date') ?></p>
+            <?php endif; ?>
+        </div>
+
+        <div id="return_date_wrapper">
+            <label for="return_date" class="block text-sm font-medium text-gray-700 mb-1">Return</label>
+            <input id="return_date" name="return_date" type="date" class="block w-40 rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                value="<?= htmlspecialchars(old('return_date', $search['return_date'] ?? '')) ?>" />
+            <?php if($errors->has('return_date')): ?>
+                <p class="mt-1 text-sm text-red-600"><?= $errors->first('return_date') ?></p>
+            <?php endif; ?>
+        </div>
+
+        <div>
+            <label for="cabin_class" class="block text-sm font-medium text-gray-700 mb-1">Cabin</label>
+            <select id="cabin_class" name="cabin_class"
+                class="block w-32 rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm">
+                <?php foreach (['ECONOMY' => 'Economy', 'PREMIUM_ECONOMY' => 'Premium Economy', 'BUSINESS' => 'Business', 'FIRST' => 'First'] as $value => $label): ?>
+                    <option value="<?= $value ?>" <?= ($search['cabin_class'] ?? 'ECONOMY') === $value ? 'selected' : '' ?>>
+                        <?= $label ?>
+                    </option>
+                <?php endforeach; ?>
+            </select>
+            <?php if($errors->has('cabin_class')): ?>
+                <p class="mt-1 text-sm text-red-600"><?= $errors->first('cabin_class') ?></p>
+            <?php endif; ?>
+        </div>
+
+        <div>
+            <span class="block text-xs font-semibold text-slate-500 mb-1">Travellers</span>
+            <div class="flex gap-2">
+            <div>
+                <label for="adults" class="block text-[11px] font-semibold text-slate-500 mb-1 text-center">Adults</label>
+                <input id="adults" name="adults" type="number" min="1" max="9"
+                    class="block w-16 rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                    value="<?= htmlspecialchars(old('adults', $search['adults'] ?? 1)) ?>" />
+            </div>
+            <div>
+                <label for="children" class="block text-[11px] font-semibold text-slate-500 mb-1 text-center">Children</label>
+                <input id="children" name="children" type="number" min="0" max="9"
+                    class="block w-16 rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                    value="<?= htmlspecialchars(old('children', $search['children'] ?? 0)) ?>" />
+            </div>
+            <div>
+                <label for="infants" class="block text-[11px] font-semibold text-slate-500 mb-1 text-center">Infants</label>
+                <input id="infants" name="infants" type="number" min="0" max="9"
+                    class="block w-16 rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500 sm:text-sm"
+                    value="<?= htmlspecialchars(old('infants', $search['infants'] ?? 0)) ?>" />
+            </div>
+            </div>
+        </div>
+
+        <div class="flex items-center gap-3 ml-auto">
+            <button type="reset" class="inline-flex items-center justify-center px-5 py-2 rounded-full border border-slate-200 bg-white text-sm font-semibold uppercase tracking-wide text-slate-900 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
+                <?= __('Reset') ?>
+            </button>
+            <button type="submit" class="inline-flex items-center justify-center px-5 py-2 rounded-full border border-transparent bg-gradient-to-br from-indigo-600 to-purple-600 text-sm font-semibold uppercase tracking-wide text-slate-900 shadow-lg transition hover:from-indigo-700 hover:to-purple-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2">
+                <?= __('Search Flights') ?>
+            </button>
+        </div>
+    </div>
+</form>
+        </div>
+    </div>
+
     <div class="py-6">
         <div class="mx-auto max-w-7xl space-y-8 sm:px-6 lg:px-8">
             @if (session('ref'))
@@ -201,190 +348,51 @@
 
             <!-- UPDATED GRID LAYOUT: 30% Left, 40% Right -->
             <div class="grid gap-6 lg:grid-cols-[30%_40%]">
-                <aside class="lg:sticky lg:top-6" style="width: 116%;">
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <form method="GET" action="{{ route('flights.search') }}" class="space-y-5" id="flight-search-form">
-                            <input type="hidden" name="trip_type" id="trip_type_input" value="{{ $tripType }}">
-
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Search</p>
-                                    <h3 class="text-lg font-semibold text-slate-900">Find flights</h3>
-                                </div>
-                                <button type="reset" class="text-xs font-semibold text-slate-500 hover:text-slate-700">Reset</button>
+            <aside class="lg:sticky lg:top-6" style="width: 116%;">
+                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div class="space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                                <span>Airlines</span>
+                                <span class="text-xs text-slate-500">{{ empty($preselectedAirlines) ? 'All' : count($preselectedAirlines) . ' selected' }}</span>
                             </div>
-
-                            <div class="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/80 p-1 text-xs font-semibold text-slate-600 shadow-sm">
-                                <button
-                                    type="button"
-                                    data-trip-type="return"
-                                    class="trip-type-btn rounded-full px-4 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'return' ? 'bg-black text-white shadow-md border border-black' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
-                                >
-                                    Return
-                                </button>
-                                <button
-                                    type="button"
-                                    data-trip-type="one_way"
-                                    class="trip-type-btn rounded-full px-4 py-2 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 {{ $tripType === 'one_way' ? 'bg-black text-white shadow-md border border-black' : 'bg-white text-slate-600 border border-transparent hover:text-slate-900 hover:bg-slate-50' }}"
-                                >
-                                    One-way
-                                </button>
-                                <button
-                                    type="button"
-                                    data-trip-type="multi_city"
-                                    disabled
-                                    class="trip-type-btn rounded-full border border-transparent bg-white px-4 py-2 text-slate-400 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed"
-                                    title="Multi-city search is coming soon">
-                                    Multi-city
-                                </button>
-                            </div>
-
-                            <div class="space-y-4">
-                                <div class="space-y-3" data-airport-selector="origin">
-                                    <div class="flex items-center justify-between">
-                                        <x-input-label for="origin_search" value="From" />
-                                        <button type="button" id="swap_routes"
-                                            class="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold text-slate-500 shadow-sm transition hover:text-sky-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 lg:hidden">
-                                            Swap
-                                        </button>
-                                    </div>
-                                    <input type="hidden" id="origin" name="origin" value="{{ old('origin', $search['origin'] ?? '') }}">
-                                    <div class="flex flex-wrap gap-2" data-airport-selected></div>
-                                    <div class="relative">
-                                        <input id="origin_search" type="text" data-airport-search
-                                            class="w-full rounded-lg border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                            placeholder="Search city, country or code" autocomplete="off">
-                                        <div
-                                            class="airport-dropdown absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl hidden"
-                                            data-airport-dropdown></div>
-                                    </div>
-                                    <x-input-error :messages="$errors->get('origin')" class="mt-1" />
-                                </div>
-
-                                <div class="space-y-3" data-airport-selector="destination">
-                                    <x-input-label for="destination_search" value="To" />
-                                    <input type="hidden" id="destination" name="destination" value="{{ old('destination', $search['destination'] ?? '') }}">
-                                    <div class="flex flex-wrap gap-2" data-airport-selected></div>
-                                    <div class="relative">
-                                        <input id="destination_search" type="text" data-airport-search
-                                            class="w-full rounded-lg border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                            placeholder="Search city, country or code" autocomplete="off">
-                                        <div
-                                            class="airport-dropdown absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-xl hidden"
-                                            data-airport-dropdown></div>
-                                    </div>
-                                    <x-input-error :messages="$errors->get('destination')" class="mt-1" />
-                                </div>
-
-                                <div class="grid gap-3 sm:grid-cols-4">
-                                    <div>
-                                        <x-input-label for="departure_date" value="Departure" />
-                                        <x-text-input id="departure_date" style="width: 322px;" name="departure_date" type="date" class="mt-1 block w-full"
-                                            value="{{ old('departure_date', $search['departure_date'] ?? '') }}" />
-                                        <x-input-error :messages="$errors->get('departure_date')" class="mt-1" />
-                                    </div>
-                                    <div id="return_date_wrapper">
-                                        <x-input-label for="return_date" value="Return" />
-                                        <x-text-input id="return_date" name="return_date" type="date" class="mt-1 block w-full"
-                                            value="{{ old('return_date', $search['return_date'] ?? '') }}" />
-                                        <x-input-error :messages="$errors->get('return_date')" class="mt-1" />
-                                    </div>
-                                </div>
-
-                                <div class="grid gap-3 sm:grid-cols-4">
-                                    <div>
-                                        <x-input-label for="cabin_class" style="width: 322px;" value="Cabin Class" />
-                                        <select style="width: 322px;" id="cabin_class" name="cabin_class"
-                                            class="mt-1 block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                            @foreach (['ECONOMY' => 'Economy', 'PREMIUM_ECONOMY' => 'Premium Economy', 'BUSINESS' => 'Business', 'FIRST' => 'First'] as $value => $label)
-                                                <option value="{{ $value }}" @selected(($search['cabin_class'] ?? 'ECONOMY') === $value)>
-                                                    {{ $label }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        <x-input-error :messages="$errors->get('cabin_class')" class="mt-1" />
-                                    </div>
-                                </div>
-                                <div class="grid gap-3 sm:grid-cols-4">
-                                    <div>
-                                        <span class="text-sm font-semibold text-slate-700">Travellers</span>
-                                        <div class="mt-2 grid grid-cols-3 gap-4" style="width: 322px;">
-                                            <div>
-                                                <x-input-label for="adults" value="Adults" class="text-xs text-slate-500" />
-                                                <x-text-input id="adults" name="adults" type="number" min="1" max="9"
-                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                    value="{{ old('adults', $search['adults'] ?? 1) }}" />
-                                                <x-input-error :messages="$errors->get('adults')" class="mt-1" />
-                                            </div>
-                                            <div>
-                                                <x-input-label for="children" value="Children" class="text-xs text-slate-500" />
-                                                <x-text-input id="children" name="children" type="number" min="0" max="9"
-                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                    value="{{ old('children', $search['children'] ?? 0) }}" />
-                                                <x-input-error :messages="$errors->get('children')" class="mt-1" />
-                                            </div>
-                                            <div>
-                                                <x-input-label for="infants" value="Infants" class="text-xs text-slate-500" />
-                                                <x-text-input id="infants" name="infants" type="number" min="0" max="9"
-                                                    class="mt-1 block w-full rounded-lg border-slate-200 text-center shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                    value="{{ old('infants', $search['infants'] ?? 0) }}" />
-                                                <x-input-error :messages="$errors->get('infants')" class="mt-1" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-                                    <div class="flex items-center justify-between">
-                                        <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                                            <span>Airlines</span>
-                                            <span class="text-xs text-slate-500">{{ empty($preselectedAirlines) ? 'All' : count($preselectedAirlines) . ' selected' }}</span>
-                                        </div>
-                                        <button type="button" data-clear-airline-filters class="text-xs font-semibold text-sky-700 hover:text-sky-800">
-                                            Clear
-                                        </button>
-                                    </div>
-                                    <div class="mt-2">
-                                        <input
-                                            type="text"
-                                            class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                            placeholder="Search airlines..."
-                                            data-airline-search
-                                        >
-                                    </div>
-                                    <div class="space-y-2 max-h-60 overflow-y-auto pr-1" data-airline-list>
-                                        @forelse ($filterAirlines as $airline)
-                                            <label class="flex items-center gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:border-sky-200 hover:bg-slate-50">
-                                                <input
-                                                    type="checkbox"
-                                                    name="selected_airlines[]"
-                                                    value="{{ $airline['code'] }}"
-                                                    class="h-4 w-4 rounded text-sky-600 focus:ring-sky-500"
-                                                    @checked(in_array($airline['code'], $preselectedAirlines, true))
-                                                >
-                                                <span class="flex-1">
-                                                    <span class="font-semibold text-slate-900">{{ $airline['code'] }}</span>
-                                                    @if ($airline['label'] !== $airline['code'])
-                                                        <span class="ml-1 text-slate-500">– {{ $airline['label'] }}</span>
-                                                    @endif
-                                                </span>
-                                            </label>
-                                        @empty
-                                            <p class="text-sm text-slate-500">No airlines available for this search.</p>
-                                        @endforelse
-                                    </div>
-                                </div>
-
-                                <div class="flex gap-2 pt-1">
-                                    <x-secondary-button type="reset" class="flex-1 justify-center">{{ __('Reset') }}</x-secondary-button>
-                                    <x-primary-button class="flex-1 justify-center">
-                                        {{ __('Search Flights') }}
-                                    </x-primary-button>
-                                </div>
-                            </div>
-                        </form>
+                            <button type="button" data-clear-airline-filters class="text-xs font-semibold text-sky-700 hover:text-sky-800">
+                                Clear
+                            </button>
+                        </div>
+                        <div class="mt-2">
+                            <input
+                                type="text"
+                                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                placeholder="Search airlines..."
+                                data-airline-search
+                            >
+                        </div>
+                        <div class="space-y-2 max-h-60 overflow-y-auto pr-1" data-airline-list>
+                            @forelse ($filterAirlines as $airline)
+                                <label class="flex items-center gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:border-sky-200 hover:bg-slate-50">
+                                    <input
+                                        type="checkbox"
+                                        name="selected_airlines[]"
+                                        value="{{ $airline['code'] }}"
+                                        form="flight-search-form"
+                                        class="h-4 w-4 rounded text-sky-600 focus:ring-sky-500"
+                                        @checked(in_array($airline['code'], $preselectedAirlines, true))
+                                    >
+                                    <span class="flex-1">
+                                        <span class="font-semibold text-slate-900">{{ $airline['code'] }}</span>
+                                        @if ($airline['label'] !== $airline['code'])
+                                            <span class="ml-1 text-slate-500">– {{ $airline['label'] }}</span>
+                                        @endif
+                                    </span>
+                                </label>
+                            @empty
+                                <p class="text-sm text-slate-500">No airlines available for this search.</p>
+                            @endforelse
+                        </div>
                     </div>
-                </aside>
+                </div>
+            </aside>
 
                 <div class="space-y-4" data-results-anchor style="width: 178%;padding-left: 60px;">
                     @if ($searchPerformed && isset($dateRangeSummaries) && $dateRangeSummaries->isNotEmpty())
@@ -536,66 +544,36 @@
                                             </div>
                                     </div>
 
-                                    <div class="grid gap-3 md:grid-cols-[1.2fr,1fr]">
-                                            <div class="space-y-2 text-sm text-gray-700">
-                                                @forelse ($offer['segments'] as $segment)
-                                                    <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                                                        <div class="flex flex-wrap items-center justify-between gap-2">
-                                                            <span class="text-sm font-semibold text-slate-800">
-                                                                {{ $segment['origin'] ?? '---' }} → {{ $segment['destination'] ?? '---' }}
-                                                            </span>
-                                                            <span class="text-xs text-gray-500">
-                                                                {{ $segment['marketing_carrier'] ?? '' }}
-                                                                {{ $segment['marketing_flight_number'] ?? '' }}
-                                                            </span>
-                                                        </div>
-                                                        <div class="mt-2 grid gap-3 text-xs text-gray-500 sm:grid-cols-2">
-                                                            <div>
-                                                                Depart:
-                                                                <span class="font-medium text-gray-700">
-                                                                    {{ isset($segment['departure']) ? \Carbon\Carbon::parse($segment['departure'])->format('d M Y H:i') : 'N/A' }}
-                                                                </span>
-                                                            </div>
-                                                            <div>
-                                                                Arrive:
-                                                                <span class="font-medium text-gray-700">
-                                                                    {{ isset($segment['arrival']) ? \Carbon\Carbon::parse($segment['arrival'])->format('d M Y H:i') : 'N/A' }}
-                                                                </span>
-                                                            </div>
-                                                        </div>
+                                    <div class="space-y-2 text-sm text-gray-700">
+                                        @forelse ($offer['segments'] as $segment)
+                                            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                                    <span class="text-sm font-semibold text-slate-800">
+                                                        {{ $segment['origin'] ?? '---' }} → {{ $segment['destination'] ?? '---' }}
+                                                    </span>
+                                                    <span class="text-xs text-gray-500">
+                                                        {{ $segment['marketing_carrier'] ?? '' }}
+                                                        {{ $segment['marketing_flight_number'] ?? '' }}
+                                                    </span>
+                                                </div>
+                                                <div class="mt-2 grid gap-3 text-xs text-gray-500 sm:grid-cols-2">
+                                                    <div>
+                                                        Depart:
+                                                        <span class="font-medium text-gray-700">
+                                                            {{ isset($segment['departure']) ? \Carbon\Carbon::parse($segment['departure'])->format('d M Y H:i') : 'N/A' }}
+                                                        </span>
                                                     </div>
-                                                @empty
-                                                    <p class="text-sm text-slate-500">No segment information available.</p>
-                                                @endforelse
-                                            </div>
-
-                                            <div class="space-y-2 rounded-lg border border-gray-100 bg-gray-50 p-3 text-sm">
-                                                <div class="flex items-center justify-between">
-                                                    <span class="text-gray-500">Adjustments</span>
-                                                    <span class="font-semibold {{ $adjustments >= 0 ? 'text-emerald-700' : 'text-rose-600' }}">
-                                                        {{ $adjustments >= 0 ? '+' : '' }}{{ number_format($adjustments, 2) }}
-                                                    </span>
+                                                    <div>
+                                                        Arrive:
+                                                        <span class="font-medium text-gray-700">
+                                                            {{ isset($segment['arrival']) ? \Carbon\Carbon::parse($segment['arrival'])->format('d M Y H:i') : 'N/A' }}
+                                                        </span>
+                                                    </div>
                                                 </div>
-                                                <div class="flex items-center justify-between">
-                                                    <span class="text-gray-500">Pricing</span>
-                                                    <span class="text-xs text-slate-600">
-                                                        {{ $engineUsed && $ruleCount > 0 ? $ruleCount . ' adjustment(s)' : 'Legacy' }}
-                                                    </span>
-                                                </div>
-                                                @if ($rulesApplied)
-                                                    <ul class="mt-2 space-y-1 text-xs text-slate-600">
-                                                        @foreach ($rulesApplied as $rule)
-                                                            @php $impactAmount = (float) ($rule['impact_amount'] ?? 0); @endphp
-                                                            <li class="flex items-center justify-between">
-                                                                <span class="truncate pr-2">{{ $rule['label'] ?? ($rule['id'] ? 'Rule #' . $rule['id'] : 'Adjustment') }}</span>
-                                                                <span class="font-semibold {{ $impactAmount >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
-                                                                    {{ $rule['impact'] ?? ($impactAmount >= 0 ? '+' : '') . number_format($impactAmount, 2) }}
-                                                                </span>
-                                                            </li>
-                                                        @endforeach
-                                                    </ul>
-                                                @endif
                                             </div>
+                                        @empty
+                                            <p class="text-sm text-slate-500">No segment information available.</p>
+                                        @endforelse
                                     </div>
 
                             @if (($offer['demo_provider'] ?? null) === 'videcom')
@@ -780,57 +758,6 @@
                                 </div>
                             </div>
                         @endif
-
-                        <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
-                            <p class="text-xs uppercase tracking-wide text-gray-500">Pricing Breakdown</p>
-                            @if ($ruleCount > 0)
-                                <div class="mt-3 overflow-x-auto">
-                                    <table class="min-w-full divide-y divide-gray-200 text-xs">
-                                        <thead class="bg-gray-50 text-gray-600">
-                                            <tr>
-                                                <th class="px-2 py-2 text-left font-semibold">Rule</th>
-                                                <th class="px-2 py-2 text-left font-semibold">Kind</th>
-                                                <th class="px-2 py-2 text-left font-semibold">Basis</th>
-                                                <th class="px-2 py-2 text-right font-semibold">Impact</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-gray-100">
-                                            @foreach ($rulesApplied as $rule)
-                                                @php
-                                                    $label = $rule['label'] ?? ($rule['id'] ? 'Rule #' . $rule['id'] : 'Adjustment');
-                                                    $details = array_filter([
-                                                        isset($rule['percent']) ? number_format((float) $rule['percent'], 2) . '%' : null,
-                                                        isset($rule['flat_amount']) ? $currency . ' ' . number_format((float) $rule['flat_amount'], 2) : null,
-                                                        isset($rule['fee_percent']) ? number_format((float) $rule['fee_percent'], 2) . '% fee' : null,
-                                                        isset($rule['fixed_fee']) ? $currency . ' ' . number_format((float) $rule['fixed_fee'], 2) : null,
-                                                    ]);
-                                                    $impactAmount = (float) ($rule['impact_amount'] ?? 0);
-                                                @endphp
-                                                <tr>
-                                                    <td class="px-2 py-2">
-                                                        <div class="font-semibold text-gray-800">{{ $label }}</div>
-                                                        @if (!empty($details))
-                                                            <div class="text-[11px] text-gray-500">{{ implode(' · ', $details) }}</div>
-                                                        @endif
-                                                    </td>
-                                                    <td class="px-2 py-2 text-gray-700">{{ $rule['kind'] ?? '—' }}</td>
-                                                    <td class="px-2 py-2 text-gray-700">{{ $rule['basis'] ?? '—' }}</td>
-                                                    <td class="px-2 py-2 text-right font-semibold {{ $impactAmount >= 0 ? 'text-emerald-600' : 'text-rose-600' }}">
-                                                        {{ $rule['impact'] ?? ($impactAmount >= 0 ? '+' : '') . number_format($impactAmount, 2) }}
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        </tbody>
-                                    </table>
-                                </div>
-                            @else
-                                <p class="mt-2 text-sm text-gray-600">No pricing rules matched; legacy defaults were used.</p>
-                            @endif
-
-                            @if (!$engineUsed && $legacySource)
-                                <p class="mt-2 text-xs text-gray-500">Legacy source: {{ \Illuminate\Support\Str::title($legacySource) }}</p>
-                            @endif
-                        </div>
 
                         @if ($requiresNdcOrder && !empty($pricedOffer['token']))
                             <div class="rounded border border-emerald-100 bg-white p-4 shadow-sm">
