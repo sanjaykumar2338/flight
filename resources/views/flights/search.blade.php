@@ -279,7 +279,7 @@
                                 <div class="grid gap-3 sm:grid-cols-4">
                                     <div>
                                         <x-input-label for="departure_date" value="Departure" />
-                                        <x-text-input id="departure_date" name="departure_date" type="date" class="mt-1 block w-full"
+                                        <x-text-input id="departure_date" style="width: 322px;" name="departure_date" type="date" class="mt-1 block w-full"
                                             value="{{ old('departure_date', $search['departure_date'] ?? '') }}" />
                                         <x-input-error :messages="$errors->get('departure_date')" class="mt-1" />
                                     </div>
@@ -293,8 +293,8 @@
 
                                 <div class="grid gap-3 sm:grid-cols-4">
                                     <div>
-                                        <x-input-label for="cabin_class" value="Cabin Class" />
-                                        <select id="cabin_class" name="cabin_class"
+                                        <x-input-label for="cabin_class" style="width: 322px;" value="Cabin Class" />
+                                        <select style="width: 322px;" id="cabin_class" name="cabin_class"
                                             class="mt-1 block w-full rounded-lg border-slate-200 shadow-sm focus:border-sky-500 focus:ring-sky-500">
                                             @foreach (['ECONOMY' => 'Economy', 'PREMIUM_ECONOMY' => 'Premium Economy', 'BUSINESS' => 'Business', 'FIRST' => 'First'] as $value => $label)
                                                 <option value="{{ $value }}" @selected(($search['cabin_class'] ?? 'ECONOMY') === $value)>
@@ -308,7 +308,7 @@
                                 <div class="grid gap-3 sm:grid-cols-4">
                                     <div>
                                         <span class="text-sm font-semibold text-slate-700">Travellers</span>
-                                        <div class="mt-2 grid grid-cols-3 gap-4">
+                                        <div class="mt-2 grid grid-cols-3 gap-4" style="width: 322px;">
                                             <div>
                                                 <x-input-label for="adults" value="Adults" class="text-xs text-slate-500" />
                                                 <x-text-input id="adults" name="adults" type="number" min="1" max="9"
