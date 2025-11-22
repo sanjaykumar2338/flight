@@ -488,7 +488,7 @@
                                         class="rounded-xl border px-3 py-3 text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 {{ $btnClasses }}"
                                         data-stat-card
                                         data-stat-type="{{ $key }}"
-                                        onclick="setSort('{{ $key }}')"
+                                        data-highlight-offer="{{ $offerSummary['offer_id'] ?? '' }}"
                                         aria-pressed="{{ $isActive ? 'true' : 'false' }}"
                                     >
                                         <p class="text-xs uppercase tracking-wide text-slate-500">{{ $label }}</p>
@@ -557,7 +557,7 @@
                                                     $shouldHideInitial = !empty($preselectedAirlines) && !in_array($primaryCarrier, $preselectedAirlines, true);
                                                 @endphp
 
-                                                <div class="{{ $shouldHideInitial ? 'hidden ' : '' }}flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" data-offer-card data-flex-offset="{{ $offset }}" data-airline-code="{{ $primaryCarrier }}" data-offer-price="{{ $totalPayable }}" data-offer-currency="{{ $currency }}">
+                                            <div class="{{ $shouldHideInitial ? 'hidden ' : '' }}flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" data-offer-card data-offer-id="{{ $offer['offer_id'] }}" data-flex-offset="{{ $offset }}" data-airline-code="{{ $primaryCarrier }}" data-offer-price="{{ $totalPayable }}" data-offer-currency="{{ $currency }}">
                                                     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                                             <div class="flex items-center gap-3">
                                                                 <div class="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-sm font-semibold text-slate-700">
@@ -1219,18 +1219,6 @@
                 }
             }
 
-            window.setSort = function(option) {
-                const sortInput = document.getElementById('sortInput');
-                const form = document.getElementById('flight-search-form');
-
-                if (!sortInput || !form) {
-                    return;
-                }
-
-                sortInput.value = option;
-                form.submit();
-            };
-
             let applyAirlineFilters = () => {};
 
             const scrollTargetId = @json($scrollTarget);
@@ -1246,6 +1234,42 @@
                 const flexButtons = Array.from(document.querySelectorAll('[data-flex-option]'));
                 const bucketContainers = Array.from(document.querySelectorAll('[data-offer-bucket]'));
                 let currentFlexOffset = Number(flexOptionsContainer?.dataset.defaultOffset ?? '0');
+                const highlightClasses = ['ring-2', 'ring-indigo-400', 'ring-offset-2'];
+                let highlightedCard = null;
+
+                const clearHighlightedCard = () => {
+                    if (highlightedCard) {
+                        highlightedCard.classList.remove(...highlightClasses);
+                        highlightedCard = null;
+                    }
+                };
+
+                const highlightOfferCard = (offerId) => {
+                    if (!offerId) {
+                        clearHighlightedCard();
+                        return;
+                    }
+
+                    const cards = Array.from(document.querySelectorAll('[data-offer-card]'));
+                    const target = cards.find((card) => {
+                        const matchesId = card.dataset.offerId === offerId;
+                        const belongsToBucket = Number(card.dataset.flexOffset ?? '0') === currentFlexOffset;
+                        const isVisible = !card.classList.contains('hidden') && !card.closest('[data-offer-bucket]')?.classList.contains('hidden');
+
+                        return matchesId && belongsToBucket && isVisible;
+                    });
+
+                    clearHighlightedCard();
+
+                    if (!target) {
+                        console.warn('Unable to highlight offer card. It may be hidden by filters.');
+                        return;
+                    }
+
+                    highlightedCard = target;
+                    highlightedCard.classList.add(...highlightClasses);
+                    highlightedCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                };
 
                 const updateFlexButtons = () => {
                     if (flexButtons.length === 0) {
@@ -1286,12 +1310,14 @@
                     if (currentFlexOffset === offset) {
                         updateFlexButtons();
                         updateBucketVisibility();
+                        clearHighlightedCard();
                         return;
                     }
 
                     currentFlexOffset = offset;
                     updateFlexButtons();
                     updateBucketVisibility();
+                    clearHighlightedCard();
                     applyAirlineFilters();
                 };
 
@@ -1551,6 +1577,8 @@
                                 const price = Number.isFinite(rawPrice) ? rawPrice : null;
                                 const currency = card.dataset.offerCurrency || '';
                                 visibleOffers.push({ price, currency });
+                            } else if (highlightedCard === card) {
+                                clearHighlightedCard();
                             }
                         });
 
@@ -1601,6 +1629,12 @@
                 };
 
                 setupAirlineFilters();
+
+                document.querySelectorAll('[data-highlight-offer]').forEach((button) => {
+                    button.addEventListener('click', () => {
+                        highlightOfferCard(button.dataset.highlightOffer || '');
+                    });
+                });
 
             });
         </script>
