@@ -35,6 +35,8 @@ class FlightSearchController extends Controller
             'next_best' => null,
         ];
         $sortOption = $this->normalizeSortOption($request->input('sort'));
+        $flexibleBuckets = collect();
+        $activeFlexOffset = 0;
 
         if ($request->filled('ref')) {
             session(['ref' => trim((string) $request->input('ref'))]);
@@ -106,17 +108,23 @@ class FlightSearchController extends Controller
                     })
                     ->values();
 
+                $flexibleBuckets = $this->buildFlexibleBuckets($allOffers, $sortOption);
+                $activeFlexOffset = $this->determineActiveFlexOffset($flexibleBuckets);
+                $currentBucket = $flexibleBuckets->get($activeFlexOffset, [
+                    'offers' => collect(),
+                    'summary' => $summaryOffers,
+                ]);
+                $offers = $currentBucket['offers'] ?? collect();
+                $summaryOffers = $currentBucket['summary'] ?? $summaryOffers;
+
                 $dateRangeSummaries = $this->buildDateRangeSummaries(
                     $searchData,
                     $allOffers,
                     $flexibleDays,
                     $request,
-                    $currencyFallback
+                    $currencyFallback,
+                    $activeFlexOffset
                 );
-
-                $offers = $this->filterOffersForSelectedRange($allOffers, $searchData);
-                [$summaryOffers, $sortedOffers] = $this->prepareSummaryOffers($offers);
-                $offers = $this->applySortOption($sortedOffers, $sortOption);
             } catch (TravelNdcException $exception) {
                 $errorMessage = $exception->getMessage();
             }
@@ -151,6 +159,8 @@ class FlightSearchController extends Controller
             'dateRangeSummaries' => $dateRangeSummaries,
             'summaryOffers' => $summaryOffers,
             'sortOption' => $sortOption,
+            'flexibleBuckets' => $flexibleBuckets,
+            'activeFlexOffset' => $activeFlexOffset,
             'pricedOffer' => $pricedOffer,
             'pricedBooking' => $pricedBooking,
             'bookingCreated' => $bookingCreated,
@@ -168,7 +178,8 @@ class FlightSearchController extends Controller
         Collection $offers,
         int $flexibleDays,
         FlightSearchRequest $request,
-        string $currencyFallback
+        string $currencyFallback,
+        int $activeOffset = 0
     ): Collection {
         $baseDeparture = $searchData->departureDate->copy();
         $baseReturn = $searchData->returnDate?->copy();
@@ -210,30 +221,36 @@ class FlightSearchController extends Controller
                     'currency' => $currency,
                     'count' => $matching->count(),
                     'url' => route('flights.search', array_filter($query, fn ($value) => $value !== null && $value !== '')),
-                    'is_selected' => $offset === 0,
+                    'is_selected' => $offset === $activeOffset,
                 ];
             })
             ->values();
     }
 
-    /**
-     * @param Collection<int, array<string, mixed>> $offers
-     */
-    private function filterOffersForSelectedRange(Collection $offers, FlightSearchData $searchData): Collection
+    private function buildFlexibleBuckets(Collection $offers, string $sortOption): Collection
     {
-        $activeDepartureDate = $searchData->departureDate->toDateString();
-
         return $offers
-            ->filter(function (array $offer) use ($activeDepartureDate) {
-                $offerDeparture = Arr::get($offer, 'departure_date');
+            ->groupBy(fn ($offer) => (int) ($offer['day_offset'] ?? 0))
+            ->sortKeys()
+            ->map(function (Collection $bucket) use ($sortOption) {
+                [$summary, $sortedOffers] = $this->prepareSummaryOffers($bucket);
 
-                if ($offerDeparture !== null) {
-                    return $offerDeparture === $activeDepartureDate;
-                }
+                return [
+                    'summary' => $summary,
+                    'offers' => $this->applySortOption($sortedOffers, $sortOption),
+                ];
+            });
+    }
 
-                return (int) Arr::get($offer, 'day_offset', 0) === 0;
-            })
-            ->values();
+    private function determineActiveFlexOffset(Collection $flexibleBuckets): int
+    {
+        if ($flexibleBuckets->has(0)) {
+            return 0;
+        }
+
+        $firstKey = $flexibleBuckets->keys()->first();
+
+        return $firstKey !== null ? (int) $firstKey : 0;
     }
 
     /**

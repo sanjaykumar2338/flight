@@ -69,7 +69,12 @@
         ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
         ->values()
         ->all();
+    $flexibleBuckets = isset($flexibleBuckets) && $flexibleBuckets instanceof \Illuminate\Support\Collection
+        ? $flexibleBuckets
+        : collect($flexibleBuckets ?? []);
+    $activeFlexOffset = isset($activeFlexOffset) ? (int) $activeFlexOffset : 0;
     $offersCollection = isset($offers) && $offers instanceof \Illuminate\Support\Collection ? $offers : collect();
+    $hasFlexibleBuckets = $flexibleBuckets->isNotEmpty();
     $activeAirlineFilters = $preselectedAirlines;
     if (!empty($activeAirlineFilters)) {
         $visibleOffers = $offersCollection
@@ -397,16 +402,23 @@
                                 <p class="text-xs text-slate-500">Select a range to refresh results</p>
                             </div>
                             <div class="overflow-x-auto">
-                                <div class="flex min-w-max gap-3">
+                                <div class="flex min-w-max gap-3" data-flex-options data-default-offset="{{ $activeFlexOffset }}">
                                     @foreach ($dateRangeSummaries as $summary)
                                         @php
                                             $rangeEnd = $summary['end'] ?? $summary['start'];
+                                            $offset = $summary['offset'];
+                                            $isActiveFlex = (int) $offset === (int) $activeFlexOffset;
+                                            $activeClasses = 'border-indigo-500 bg-indigo-50 text-indigo-900 shadow';
+                                            $inactiveClasses = 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300';
                                         @endphp
-                                        <a
-                                            href="{{ $summary['url'] }}"
-                                            data-flexible-range-link
-                                            data-base-href="{{ $summary['url'] }}"
-                                            class="flex w-48 flex-col rounded-xl border px-4 py-3 transition {{ $summary['is_selected'] ? 'border-indigo-500 bg-indigo-50 text-indigo-900 shadow' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300' }}"
+                                        <button
+                                            type="button"
+                                            data-flex-option
+                                            data-flex-offset="{{ $offset }}"
+                                            data-active-class="{{ $activeClasses }}"
+                                            data-inactive-class="{{ $inactiveClasses }}"
+                                            class="flex w-48 flex-col rounded-xl border px-4 py-3 text-left transition {{ $isActiveFlex ? $activeClasses : $inactiveClasses }}"
+                                            aria-pressed="{{ $isActiveFlex ? 'true' : 'false' }}"
                                         >
                                             <span class="text-xs font-semibold uppercase text-slate-500">
                                                 {{ $summary['start']->format('d M') }}
@@ -424,7 +436,7 @@
                                                 {{ $summary['count'] }}
                                                 {{ \Illuminate\Support\Str::plural('offer', $summary['count']) }}
                                             </span>
-                                        </a>
+                                        </button>
                                     @endforeach
                                 </div>
                             </div>
@@ -489,184 +501,203 @@
                             </div>
                         @endif
 
-                        @if ($offers->isEmpty())
+                        @if (!$hasFlexibleBuckets)
                             <div class="rounded border border-yellow-200 bg-yellow-50 p-8 text-center text-yellow-900">
                                 No flight offers were found for the selected criteria. Try adjusting the dates, airports, or airline filters.
                             </div>
                         @else
-                            <div class="space-y-4" data-offer-list>
-                                @foreach ($offers as $offer)
-                                @php
-                                    $tokenPayload = base64_encode(json_encode([
-                                        'offer_id' => $offer['offer_id'],
-                                        'owner' => $offer['owner'],
-                                        'response_id' => $offer['response_id'] ?? null,
-                                        'currency' => $offer['currency'] ?? $currencyFallback,
-                                        'offer_items' => $offer['offer_items'] ?? [],
-                                        'segments' => $offer['segments'] ?? [],
-                                        'primary_carrier' => $offer['primary_carrier'] ?? $offer['owner'],
-                                        'demo_provider' => $offer['demo_provider'] ?? null,
-                                        'ndc_pricing' => \Illuminate\Support\Arr::only(
-                                            $offer['ndc_pricing'] ?? ($offer['pricing'] ?? []),
-                                            ['base_amount', 'tax_amount', 'total_amount']
-                                        ),
-                                        'pricing' => [
-                                            'context' => $offer['pricing_context'] ?? ($offer['pricing']['context'] ?? []),
-                                            'passengers' => $offer['passenger_summary'] ?? ($offer['pricing']['passengers'] ?? []),
-                                        ],
-                                    ], JSON_UNESCAPED_SLASHES) ?: '');
-
-                                    $pricingData = $offer['pricing'] ?? [];
-                                    $ndc = $pricingData['ndc'] ?? [];
-                                    $baseFare = $ndc['base_amount'] ?? ($pricingData['base_amount'] ?? 0);
-                                    $taxes = $ndc['tax_amount'] ?? ($pricingData['tax_amount'] ?? 0);
-                                    $adjustments = $pricingData['components']['adjustments'] ?? round(($pricingData['payable_total'] ?? 0) - ($baseFare + $taxes), 2);
-                                    $engineUsed = data_get($pricingData, 'engine.used', false);
-                                    $rulesApplied = $pricingData['rules_applied'] ?? [];
-                                    $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
-                                    $currency = $offer['currency'] ?? $currencyFallback;
-                                    $primaryCarrier = strtoupper($offer['primary_carrier'] ?? $offer['owner'] ?? '');
-                                    $displayCarrier = $offer['airline_name'] ?? ($offer['primary_carrier'] ?? $offer['owner']);
-                                    $totalPayable = (float) ($pricingData['payable_total'] ?? $pricingData['total_amount'] ?? 0);
-                                    $shouldHideInitial = !empty($preselectedAirlines) && !in_array($primaryCarrier, $preselectedAirlines, true);
-                                @endphp
-
-                                <div class="{{ $shouldHideInitial ? 'hidden ' : '' }}flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" data-offer-card data-airline-code="{{ $primaryCarrier }}" data-offer-price="{{ $totalPayable }}" data-offer-currency="{{ $currency }}">
-                                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                            <div class="flex items-center gap-3">
-                                                <div class="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-sm font-semibold text-slate-700">
-                                                    {{ \Illuminate\Support\Str::limit($displayCarrier, 2, '') }}
-                                                </div>
-                                                <div>
-                                                    <p class="text-sm font-semibold text-indigo-700">
-                                                        {{ $displayCarrier }}
-                                                    </p>
-                                                    <p class="text-xs text-slate-500">
-                                                        {{ $offer['departure_date'] }}
-                                                        @if (!empty($offer['day_offset']))
-                                                            ({{ $offer['day_offset'] > 0 ? '+' : '' }}{{ $offer['day_offset'] }} day)
-                                                        @endif
-                                                    </p>
-                                                </div>
+                            <div data-flex-buckets>
+                                @foreach ($flexibleBuckets as $offset => $bucket)
+                                    @php
+                                        $bucketOffers = ($bucket['offers'] ?? collect()) instanceof \Illuminate\Support\Collection
+                                            ? $bucket['offers']
+                                            : collect($bucket['offers'] ?? []);
+                                        $isActiveBucket = (int) $offset === (int) $activeFlexOffset;
+                                    @endphp
+                                    <div class="{{ $isActiveBucket ? '' : 'hidden' }}" data-offer-bucket data-flex-offset="{{ $offset }}">
+                                        @if ($bucketOffers->isEmpty())
+                                            <div class="rounded border border-yellow-200 bg-yellow-50 p-8 text-center text-yellow-900">
+                                                No flight offers were found for the selected criteria. Try adjusting the dates, airports, or airline filters.
                                             </div>
-                                            <div class="flex items-center gap-3 text-right">
-                                                <div class="text-lg font-bold text-slate-900">
-                                                    {{ $currency }} {{ number_format($totalPayable, 2) }}
-                                                </div>
-                                                <div class="text-[11px] text-slate-500">
-                                                    <div>Base: {{ $currency }} {{ number_format($baseFare, 2) }}</div>
-                                                    <div>Taxes: {{ $currency }} {{ number_format($taxes, 2) }}</div>
-                                                </div>
-                                                <form method="POST" action="{{ route('offers.price') }}">
-                                                    @csrf
-                                                    <input type="hidden" name="offer_token" value="{{ $tokenPayload }}">
-                                                    <button type="submit"
-                                                        class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
-                                                        Select →
-                                                    </button>
-                                                </form>
-                                            </div>
-                                    </div>
+                                        @else
+                                            <div class="space-y-4" data-offer-list>
+                                                @foreach ($bucketOffers as $offer)
+                                                @php
+                                                    $tokenPayload = base64_encode(json_encode([
+                                                        'offer_id' => $offer['offer_id'],
+                                                        'owner' => $offer['owner'],
+                                                        'response_id' => $offer['response_id'] ?? null,
+                                                        'currency' => $offer['currency'] ?? $currencyFallback,
+                                                        'offer_items' => $offer['offer_items'] ?? [],
+                                                        'segments' => $offer['segments'] ?? [],
+                                                        'primary_carrier' => $offer['primary_carrier'] ?? $offer['owner'],
+                                                        'demo_provider' => $offer['demo_provider'] ?? null,
+                                                        'ndc_pricing' => \Illuminate\Support\Arr::only(
+                                                            $offer['ndc_pricing'] ?? ($offer['pricing'] ?? []),
+                                                            ['base_amount', 'tax_amount', 'total_amount']
+                                                        ),
+                                                        'pricing' => [
+                                                            'context' => $offer['pricing_context'] ?? ($offer['pricing']['context'] ?? []),
+                                                            'passengers' => $offer['passenger_summary'] ?? ($offer['pricing']['passengers'] ?? []),
+                                                        ],
+                                                    ], JSON_UNESCAPED_SLASHES) ?: '');
 
-                                    <div class="space-y-2 text-sm text-gray-700">
-                                        @forelse ($offer['segments'] as $segment)
-                                            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
-                                                <div class="flex flex-wrap items-center justify-between gap-2">
-                                                    <span class="text-sm font-semibold text-slate-800">
-                                                        {{ $segment['origin'] ?? '---' }} → {{ $segment['destination'] ?? '---' }}
-                                                    </span>
-                                                    <span class="text-xs text-gray-500">
-                                                        {{ $segment['marketing_carrier'] ?? '' }}
-                                                        {{ $segment['marketing_flight_number'] ?? '' }}
-                                                    </span>
-                                                </div>
-                                                <div class="mt-2 grid gap-3 text-xs text-gray-500 sm:grid-cols-2">
-                                                    <div>
-                                                        Depart:
-                                                        <span class="font-medium text-gray-700">
-                                                            {{ isset($segment['departure']) ? \Carbon\Carbon::parse($segment['departure'])->format('d M Y H:i') : 'N/A' }}
-                                                        </span>
+                                                    $pricingData = $offer['pricing'] ?? [];
+                                                    $ndc = $pricingData['ndc'] ?? [];
+                                                    $baseFare = $ndc['base_amount'] ?? ($pricingData['base_amount'] ?? 0);
+                                                    $taxes = $ndc['tax_amount'] ?? ($pricingData['tax_amount'] ?? 0);
+                                                    $adjustments = $pricingData['components']['adjustments'] ?? round(($pricingData['payable_total'] ?? 0) - ($baseFare + $taxes), 2);
+                                                    $engineUsed = data_get($pricingData, 'engine.used', false);
+                                                    $rulesApplied = $pricingData['rules_applied'] ?? [];
+                                                    $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
+                                                    $currency = $offer['currency'] ?? $currencyFallback;
+                                                    $primaryCarrier = strtoupper($offer['primary_carrier'] ?? $offer['owner'] ?? '');
+                                                    $displayCarrier = $offer['airline_name'] ?? ($offer['primary_carrier'] ?? $offer['owner']);
+                                                    $totalPayable = (float) ($pricingData['payable_total'] ?? $pricingData['total_amount'] ?? 0);
+                                                    $shouldHideInitial = !empty($preselectedAirlines) && !in_array($primaryCarrier, $preselectedAirlines, true);
+                                                @endphp
+
+                                                <div class="{{ $shouldHideInitial ? 'hidden ' : '' }}flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" data-offer-card data-flex-offset="{{ $offset }}" data-airline-code="{{ $primaryCarrier }}" data-offer-price="{{ $totalPayable }}" data-offer-currency="{{ $currency }}">
+                                                    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                                            <div class="flex items-center gap-3">
+                                                                <div class="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-sm font-semibold text-slate-700">
+                                                                    {{ \Illuminate\Support\Str::limit($displayCarrier, 2, '') }}
+                                                                </div>
+                                                                <div>
+                                                                    <p class="text-sm font-semibold text-indigo-700">
+                                                                        {{ $displayCarrier }}
+                                                                    </p>
+                                                                    <p class="text-xs text-slate-500">
+                                                                        {{ $offer['departure_date'] }}
+                                                                        @if (!empty($offer['day_offset']))
+                                                                            ({{ $offer['day_offset'] > 0 ? '+' : '' }}{{ $offer['day_offset'] }} day)
+                                                                        @endif
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="flex items-center gap-3 text-right">
+                                                                <div class="text-lg font-bold text-slate-900">
+                                                                    {{ $currency }} {{ number_format($totalPayable, 2) }}
+                                                                </div>
+                                                                <div class="text-[11px] text-slate-500">
+                                                                    <div>Base: {{ $currency }} {{ number_format($baseFare, 2) }}</div>
+                                                                    <div>Taxes: {{ $currency }} {{ number_format($taxes, 2) }}</div>
+                                                                </div>
+                                                                <form method="POST" action="{{ route('offers.price') }}">
+                                                                    @csrf
+                                                                    <input type="hidden" name="offer_token" value="{{ $tokenPayload }}">
+                                                                    <button type="submit"
+                                                                        class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                                                                        Select →
+                                                                    </button>
+                                                                </form>
+                                                            </div>
                                                     </div>
-                                                    <div>
-                                                        Arrive:
-                                                        <span class="font-medium text-gray-700">
-                                                            {{ isset($segment['arrival']) ? \Carbon\Carbon::parse($segment['arrival'])->format('d M Y H:i') : 'N/A' }}
-                                                        </span>
+
+                                                    <div class="space-y-2 text-sm text-gray-700">
+                                                        @forelse ($offer['segments'] as $segment)
+                                                            <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                                                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                                                    <span class="text-sm font-semibold text-slate-800">
+                                                                        {{ $segment['origin'] ?? '---' }} → {{ $segment['destination'] ?? '---' }}
+                                                                    </span>
+                                                                    <span class="text-xs text-gray-500">
+                                                                        {{ $segment['marketing_carrier'] ?? '' }}
+                                                                        {{ $segment['marketing_flight_number'] ?? '' }}
+                                                                    </span>
+                                                                </div>
+                                                                <div class="mt-2 grid gap-3 text-xs text-gray-500 sm:grid-cols-2">
+                                                                    <div>
+                                                                        Depart:
+                                                                        <span class="font-medium text-gray-700">
+                                                                            {{ isset($segment['departure']) ? \Carbon\Carbon::parse($segment['departure'])->format('d M Y H:i') : 'N/A' }}
+                                                                        </span>
+                                                                    </div>
+                                                                    <div>
+                                                                        Arrive:
+                                                                        <span class="font-medium text-gray-700">
+                                                                            {{ isset($segment['arrival']) ? \Carbon\Carbon::parse($segment['arrival'])->format('d M Y H:i') : 'N/A' }}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        @empty
+                                                            <p class="text-sm text-slate-500">No segment information available.</p>
+                                                        @endforelse
                                                     </div>
+
+                                            @if (($offer['demo_provider'] ?? null) === 'videcom')
+                                                <div class="mt-5 border-t border-gray-100 pt-4">
+                                                    <p class="text-sm font-semibold text-gray-800">Hold this itinerary with Videcom</p>
+                                                    <p class="text-xs text-gray-500">Creates a temporary reservation directly with Videcom.</p>
+
+                                                    <form method="POST" action="{{ route('offers.hold') }}" class="mt-3 space-y-3">
+                                                            @csrf
+                                                            <input type="hidden" name="offer_token" value="{{ $tokenPayload }}">
+
+                                                            <div class="grid gap-3 md:grid-cols-3">
+                                                                <div>
+                                                                    <x-input-label for="passenger_title_{{ $loop->parent->index }}_{{ $loop->index }}" value="Title" />
+                                                                    <select id="passenger_title_{{ $loop->parent->index }}_{{ $loop->index }}" name="passenger_title"
+                                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
+                                                                        @foreach (['MR', 'MRS', 'MS'] as $title)
+                                                                            <option value="{{ $title }}" @selected(old('passenger_title', 'MR') === $title)>
+                                                                                {{ $title }}
+                                                                            </option>
+                                                                        @endforeach
+                                                                    </select>
+                                                                    <x-input-error :messages="$errors->get('passenger_title')" class="mt-1" />
+                                                                </div>
+                                                                <div>
+                                                                    <x-input-label for="passenger_first_name_{{ $loop->parent->index }}_{{ $loop->index }}" value="First Name" />
+                                                                    <x-text-input id="passenger_first_name_{{ $loop->parent->index }}_{{ $loop->index }}" name="passenger_first_name" type="text"
+                                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                                        value="{{ old('passenger_first_name', auth()->user()?->name ? explode(' ', auth()->user()->name, 2)[0] : '') }}" />
+                                                                    <x-input-error :messages="$errors->get('passenger_first_name')" class="mt-1" />
+                                                                </div>
+                                                                <div>
+                                                                    <x-input-label for="passenger_last_name_{{ $loop->parent->index }}_{{ $loop->index }}" value="Last Name" />
+                                                                    <x-text-input id="passenger_last_name_{{ $loop->parent->index }}_{{ $loop->index }}" name="passenger_last_name" type="text"
+                                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                                        value="{{ old('passenger_last_name') }}" />
+                                                                    <x-input-error :messages="$errors->get('passenger_last_name')" class="mt-1" />
+                                                                </div>
+                                                            </div>
+
+                                                            <div class="grid gap-3 md:grid-cols-2">
+                                                                <div>
+                                                                    <x-input-label for="contact_email_{{ $loop->parent->index }}_{{ $loop->index }}" value="Contact Email" />
+                                                                    <x-text-input id="contact_email_{{ $loop->parent->index }}_{{ $loop->index }}" name="contact_email" type="email"
+                                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                                        value="{{ old('contact_email', auth()->user()?->email) }}" />
+                                                                    <x-input-error :messages="$errors->get('contact_email')" class="mt-1" />
+                                                                </div>
+                                                                <div>
+                                                                    <x-input-label for="contact_phone_{{ $loop->parent->index }}_{{ $loop->index }}" value="Contact Phone" />
+                                                                    <x-text-input id="contact_phone_{{ $loop->parent->index }}_{{ $loop->index }}" name="contact_phone" type="text"
+                                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                                                        value="{{ old('contact_phone') }}" />
+                                                                    <x-input-error :messages="$errors->get('contact_phone')" class="mt-1" />
+                                                                </div>
+                                                            </div>
+
+                                                            <x-primary-button class="w-full justify-center">
+                                                                {{ __('Hold Booking via Videcom') }}
+                                                            </x-primary-button>
+                                                    </form>
                                                 </div>
+                                            @endif
+                                        </div>
+                                                @endforeach
                                             </div>
-                                        @empty
-                                            <p class="text-sm text-slate-500">No segment information available.</p>
-                                        @endforelse
+                                        @endif
                                     </div>
-
-                            @if (($offer['demo_provider'] ?? null) === 'videcom')
-                                <div class="mt-5 border-t border-gray-100 pt-4">
-                                    <p class="text-sm font-semibold text-gray-800">Hold this itinerary with Videcom</p>
-                                    <p class="text-xs text-gray-500">Creates a temporary reservation directly with Videcom.</p>
-
-                                    <form method="POST" action="{{ route('offers.hold') }}" class="mt-3 space-y-3">
-                                            @csrf
-                                            <input type="hidden" name="offer_token" value="{{ $tokenPayload }}">
-
-                                            <div class="grid gap-3 md:grid-cols-3">
-                                                <div>
-                                                    <x-input-label for="passenger_title_{{ $loop->index }}" value="Title" />
-                                                    <select id="passenger_title_{{ $loop->index }}" name="passenger_title"
-                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500">
-                                                        @foreach (['MR', 'MRS', 'MS'] as $title)
-                                                            <option value="{{ $title }}" @selected(old('passenger_title', 'MR') === $title)>
-                                                                {{ $title }}
-                                                            </option>
-                                                        @endforeach
-                                                    </select>
-                                                    <x-input-error :messages="$errors->get('passenger_title')" class="mt-1" />
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="passenger_first_name_{{ $loop->index }}" value="First Name" />
-                                                    <x-text-input id="passenger_first_name_{{ $loop->index }}" name="passenger_first_name" type="text"
-                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                        value="{{ old('passenger_first_name', auth()->user()?->name ? explode(' ', auth()->user()->name, 2)[0] : '') }}" />
-                                                    <x-input-error :messages="$errors->get('passenger_first_name')" class="mt-1" />
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="passenger_last_name_{{ $loop->index }}" value="Last Name" />
-                                                    <x-text-input id="passenger_last_name_{{ $loop->index }}" name="passenger_last_name" type="text"
-                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                        value="{{ old('passenger_last_name') }}" />
-                                                    <x-input-error :messages="$errors->get('passenger_last_name')" class="mt-1" />
-                                                </div>
-                                            </div>
-
-                                            <div class="grid gap-3 md:grid-cols-2">
-                                                <div>
-                                                    <x-input-label for="contact_email_{{ $loop->index }}" value="Contact Email" />
-                                                    <x-text-input id="contact_email_{{ $loop->index }}" name="contact_email" type="email"
-                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                        value="{{ old('contact_email', auth()->user()?->email) }}" />
-                                                    <x-input-error :messages="$errors->get('contact_email')" class="mt-1" />
-                                                </div>
-                                                <div>
-                                                    <x-input-label for="contact_phone_{{ $loop->index }}" value="Contact Phone" />
-                                                    <x-text-input id="contact_phone_{{ $loop->index }}" name="contact_phone" type="text"
-                                                        class="mt-1 block w-full rounded-lg border-slate-200 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                                        value="{{ old('contact_phone') }}" />
-                                                    <x-input-error :messages="$errors->get('contact_phone')" class="mt-1" />
-                                                </div>
-                                            </div>
-
-                                            <x-primary-button class="w-full justify-center">
-                                                {{ __('Hold Booking via Videcom') }}
-                                            </x-primary-button>
-                                    </form>
-                                </div>
-                            @endif
-                        </div>
-                        @endforeach
+                                @endforeach
                             </div>
-                            <div class="rounded border border-yellow-200 bg-yellow-50 p-8 text-center text-yellow-900 {{ $offersCount > 0 ? 'hidden' : '' }}" data-filter-no-results>
+                            <div class="rounded border border-yellow-200 bg-yellow-50 p-8 text-center text-yellow-900 hidden" data-filter-no-results>
                                 No flight offers match the selected airlines.
                             </div>
+                        @endif
                     </div>
                 @endif
             @else
@@ -1201,6 +1232,8 @@
                 form.submit();
             };
 
+            let applyAirlineFilters = () => {};
+
             const scrollTargetId = @json($scrollTarget);
             const scrollToResults = @json($searchPerformed);
             document.addEventListener('DOMContentLoaded', () => {
@@ -1210,6 +1243,68 @@
                 const returnInput = document.getElementById('return_date');
                 const swapRoutesButton = document.getElementById('swap_routes');
                 const sortInput = document.getElementById('sortInput');
+                const flexOptionsContainer = document.querySelector('[data-flex-options]');
+                const flexButtons = Array.from(document.querySelectorAll('[data-flex-option]'));
+                const bucketContainers = Array.from(document.querySelectorAll('[data-offer-bucket]'));
+                let currentFlexOffset = Number(flexOptionsContainer?.dataset.defaultOffset ?? '0');
+
+                const updateFlexButtons = () => {
+                    if (flexButtons.length === 0) {
+                        return;
+                    }
+
+                    flexButtons.forEach((button) => {
+                        const offset = Number(button.dataset.flexOffset ?? '0');
+                        const activeClasses = (button.dataset.activeClass || '').split(' ').filter(Boolean);
+                        const inactiveClasses = (button.dataset.inactiveClass || '').split(' ').filter(Boolean);
+                        const isActive = offset === currentFlexOffset;
+
+                        if (activeClasses.length > 0 || inactiveClasses.length > 0) {
+                            button.classList.remove(...activeClasses, ...inactiveClasses);
+                            button.classList.add(...(isActive ? activeClasses : inactiveClasses));
+                        }
+
+                        button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+                    });
+                };
+
+                const updateBucketVisibility = () => {
+                    if (bucketContainers.length === 0) {
+                        return;
+                    }
+
+                    bucketContainers.forEach((container) => {
+                        const offset = Number(container.dataset.flexOffset ?? '0');
+                        container.classList.toggle('hidden', offset !== currentFlexOffset);
+                    });
+                };
+
+                const setFlexOffset = (offset) => {
+                    if (!Number.isFinite(offset)) {
+                        return;
+                    }
+
+                    if (currentFlexOffset === offset) {
+                        updateFlexButtons();
+                        updateBucketVisibility();
+                        return;
+                    }
+
+                    currentFlexOffset = offset;
+                    updateFlexButtons();
+                    updateBucketVisibility();
+                    applyAirlineFilters();
+                };
+
+                updateFlexButtons();
+                updateBucketVisibility();
+
+                flexButtons.forEach((button) => {
+                    button.addEventListener('click', () => {
+                        const offset = Number(button.dataset.flexOffset ?? '0');
+                        setFlexOffset(offset);
+                    });
+                });
 
                 const setActiveTripType = (value) => {
                     if (!tripTypeInput) {
@@ -1349,7 +1444,6 @@
                     const statsContainer = document.querySelector('[data-offer-stats]');
                     const statsCards = statsContainer ? Array.from(statsContainer.querySelectorAll('[data-stat-card]')) : [];
                     const emptyState = document.querySelector('[data-filter-no-results]');
-                    const flexibleLinks = Array.from(document.querySelectorAll('[data-flexible-range-link]'));
 
                     const formatAmount = (value) => {
                         const number = Number(value);
@@ -1432,33 +1526,6 @@
                         }
                     };
 
-                    const buildUrlWithSelection = (href, codes) => {
-                        try {
-                            const url = new URL(href, window.location.origin);
-                            url.searchParams.delete('selected_airlines[]');
-                            codes.forEach((code) => url.searchParams.append('selected_airlines[]', code));
-                            return url.toString();
-                        } catch (error) {
-                            return href;
-                        }
-                    };
-
-                    const updateFlexibleLinks = (codes) => {
-                        if (flexibleLinks.length === 0) {
-                            return;
-                        }
-
-                        flexibleLinks.forEach((link) => {
-                            const baseHref = link.getAttribute('data-base-href') || link.getAttribute('href');
-                            if (!baseHref) {
-                                return;
-                            }
-
-                            const nextHref = buildUrlWithSelection(baseHref, codes);
-                            link.setAttribute('href', nextHref);
-                        });
-                    };
-
                     const getSelectedCodes = () => filterCheckboxes
                         .filter((checkbox) => checkbox.checked)
                         .map((checkbox) => (checkbox.value || '').toUpperCase())
@@ -1467,13 +1534,20 @@
                     const applyFilters = () => {
                         const selectedCodes = getSelectedCodes();
                         const visibleOffers = [];
+                        let bucketHasOffers = false;
 
                         offerCards.forEach((card) => {
+                            const cardOffset = Number(card.dataset.flexOffset ?? '0');
+                            const matchesBucket = cardOffset === currentFlexOffset;
+                            if (matchesBucket) {
+                                bucketHasOffers = true;
+                            }
                             const code = (card.dataset.airlineCode || '').toUpperCase();
-                            const matches = selectedCodes.length === 0 || selectedCodes.includes(code);
-                            card.classList.toggle('hidden', !matches);
+                            const matchesAirline = selectedCodes.length === 0 || selectedCodes.includes(code);
+                            const shouldShow = matchesBucket && matchesAirline;
+                            card.classList.toggle('hidden', !shouldShow);
 
-                            if (matches) {
+                            if (shouldShow) {
                                 const rawPrice = Number(card.dataset.offerPrice ?? '0');
                                 const price = Number.isFinite(rawPrice) ? rawPrice : null;
                                 const currency = card.dataset.offerCurrency || '';
@@ -1501,12 +1575,12 @@
                         }
 
                         if (emptyState) {
-                            emptyState.classList.toggle('hidden', visibleOffers.length > 0);
+                            const showEmpty = bucketHasOffers && visibleOffers.length === 0;
+                            emptyState.classList.toggle('hidden', !showEmpty);
                         }
 
                         updateStats(visibleOffers);
                         updateHistory(selectedCodes);
-                        updateFlexibleLinks(selectedCodes);
                     };
 
                     filterCheckboxes.forEach((checkbox) => {
@@ -1523,6 +1597,7 @@
                         });
                     });
 
+                    applyAirlineFilters = applyFilters;
                     applyFilters();
                 };
 
