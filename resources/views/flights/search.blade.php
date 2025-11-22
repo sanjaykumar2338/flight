@@ -69,53 +69,46 @@
         ->sortBy('label', SORT_NATURAL | SORT_FLAG_CASE)
         ->values()
         ->all();
-    $offersCount = isset($offers) && $offers instanceof \Illuminate\Support\Collection ? $offers->count() : 0;
-    $offerStats = [
-        'best' => null,
-        'cheapest' => null,
-        'fastest' => null,
-    ];
-    if ($offersCount > 0) {
-        $statsSource = $offers
-            ->map(function ($offer) use ($currencyFallback) {
-                $pricingData = $offer['pricing'] ?? [];
-                $total = (float) ($pricingData['payable_total'] ?? $pricingData['total_amount'] ?? 0);
-                $currency = $offer['currency'] ?? $currencyFallback;
+    $offersCollection = isset($offers) && $offers instanceof \Illuminate\Support\Collection ? $offers : collect();
+    $activeAirlineFilters = $preselectedAirlines;
+    if (!empty($activeAirlineFilters)) {
+        $visibleOffers = $offersCollection
+            ->filter(function ($offer) use ($activeAirlineFilters) {
+                $carrier = strtoupper((string) data_get($offer, 'primary_carrier', data_get($offer, 'owner', '')));
 
-                return [
-                    'total' => $total,
-                    'currency' => $currency,
-                    'day_offset' => $offer['day_offset'] ?? 0,
-                ];
+                return $carrier !== '' && in_array($carrier, $activeAirlineFilters, true);
             })
-            ->sortBy('total')
             ->values();
 
-        $best = $statsSource->first();
-        $cheapest = $statsSource->first();
-        $second = $statsSource->get(1);
-
-        $offerStats['best'] = $best ? [
-            'label' => 'Best',
-            'total' => $best['total'],
-            'currency' => $best['currency'],
-            'subtitle' => 'Great balance of price & time',
-        ] : null;
-
-        $offerStats['cheapest'] = $cheapest ? [
-            'label' => 'Cheapest',
-            'total' => $cheapest['total'],
-            'currency' => $cheapest['currency'],
-            'subtitle' => 'Lowest fare available',
-        ] : null;
-
-        $offerStats['fastest'] = $second ? [
-            'label' => 'Next best',
-            'total' => $second['total'],
-            'currency' => $second['currency'],
-            'subtitle' => 'Close alternative',
-        ] : $offerStats['cheapest'];
+        if ($visibleOffers->isEmpty()) {
+            $visibleOffers = collect();
+        }
+    } else {
+        $visibleOffers = $offersCollection;
     }
+
+    $offersCount = $visibleOffers->count();
+    $summaryOffers = array_merge([
+        'best' => null,
+        'cheapest' => null,
+        'next_best' => null,
+    ], $summaryOffers ?? []);
+    $currentSort = old('sort', $search['sort'] ?? ($sortOption ?? 'best'));
+    $allowedSorts = ['best', 'cheapest', 'next_best'];
+    if (!in_array($currentSort, $allowedSorts, true)) {
+        $currentSort = 'best';
+    }
+    $sortLabels = [
+        'best' => 'Best',
+        'cheapest' => 'Cheapest',
+        'next_best' => 'Next Best',
+    ];
+    $currentSortLabel = $sortLabels[$currentSort] ?? 'Best';
+    $summaryCardConfig = [
+        'best' => 'Great balance of price & time',
+        'cheapest' => 'Lowest fare available',
+        'next_best' => 'Close alternative',
+    ];
 @endphp
 
 <x-app-layout>
@@ -129,6 +122,7 @@
         <div class="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
             <form method="GET" action="<?= route('flights.search') ?>" id="flight-search-form" class="space-y-4">
             <input type="hidden" name="trip_type" id="trip_type_input" value="<?= htmlspecialchars($tripType) ?>">
+            <input type="hidden" name="sort" id="sortInput" value="<?= htmlspecialchars($currentSort) ?>">
             <div class="flex flex-wrap items-end gap-4 pb-4 border-b border-slate-100">
         
         <div>
@@ -350,11 +344,11 @@
             <div class="grid gap-6 lg:grid-cols-[30%_40%]">
             <aside class="lg:sticky lg:top-6" style="width: 116%;">
                 <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
+                    <div class="space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3" data-airline-filter-wrapper>
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
                                 <span>Airlines</span>
-                                <span class="text-xs text-slate-500">{{ empty($preselectedAirlines) ? 'All' : count($preselectedAirlines) . ' selected' }}</span>
+                                <span class="text-xs text-slate-500" data-airline-selection-count>{{ empty($preselectedAirlines) ? 'All' : count($preselectedAirlines) . ' selected' }}</span>
                             </div>
                             <button type="button" data-clear-airline-filters class="text-xs font-semibold text-sky-700 hover:text-sky-800">
                                 Clear
@@ -377,6 +371,7 @@
                                         value="{{ $airline['code'] }}"
                                         form="flight-search-form"
                                         class="h-4 w-4 rounded text-sky-600 focus:ring-sky-500"
+                                        data-airline-filter
                                         @checked(in_array($airline['code'], $preselectedAirlines, true))
                                     >
                                     <span class="flex-1">
@@ -409,6 +404,8 @@
                                         @endphp
                                         <a
                                             href="{{ $summary['url'] }}"
+                                            data-flexible-range-link
+                                            data-base-href="{{ $summary['url'] }}"
                                             class="flex w-48 flex-col rounded-xl border px-4 py-3 transition {{ $summary['is_selected'] ? 'border-indigo-500 bg-indigo-50 text-indigo-900 shadow' : 'border-slate-200 bg-white text-slate-700 hover:border-indigo-300' }}"
                                         >
                                             <span class="text-xs font-semibold uppercase text-slate-500">
@@ -437,14 +434,14 @@
                     @if ($searchPerformed)
                         <div class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
                             <div class="flex items-center gap-3">
-                                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                                    {{ $offersCount }} {{ \Illuminate\Support\Str::plural('result', $offersCount) }} sorted by Best
+                                <span class="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700" data-offer-count data-sort-label="{{ $currentSortLabel }}">
+                                    {{ $offersCount }} {{ \Illuminate\Support\Str::plural('result', $offersCount) }} sorted by {{ $currentSortLabel }}
                                 </span>
                                 <button class="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700" type="button">
                                     Get price alerts
                                 </button>
                             </div>
-                            <span class="text-xs text-slate-500">
+                            <span class="text-xs text-slate-500" data-airline-filter-summary data-default-text="Showing all airlines">
                                 @if (!empty($selectedAirlineSummary))
                                     Filtered: {{ implode(', ', $selectedAirlineSummary) }}
                                 @else
@@ -453,17 +450,41 @@
                             </span>
                         </div>
 
-                        @if ($offersCount > 0 && $offerStats['best'])
-                            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 shadow-sm md:grid-cols-3">
-                                @foreach (['best', 'cheapest', 'fastest'] as $key)
-                                    @php $stat = $offerStats[$key] ?? null; @endphp
-                                    @if ($stat)
-                                        <div class="rounded-xl border border-slate-200 bg-white/80 px-3 py-3 shadow-sm">
-                                            <p class="text-xs uppercase tracking-wide text-slate-500">{{ $stat['label'] }}</p>
-                                            <p class="text-lg font-bold text-slate-900">{{ $stat['currency'] }} {{ number_format($stat['total'], 2) }}</p>
-                                            <p class="text-[11px] text-slate-500">{{ $stat['subtitle'] }}</p>
-                                        </div>
-                                    @endif
+                        @php
+                            $hasSummaryData = collect($summaryOffers)->filter()->isNotEmpty();
+                        @endphp
+                        @if ($offersCount > 0 && $hasSummaryData)
+                            <div class="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800 shadow-sm md:grid-cols-3" data-offer-stats>
+                                @foreach (['best', 'cheapest', 'next_best'] as $key)
+                                    @php
+                                        $offerSummary = $summaryOffers[$key] ?? null;
+                                        if (!$offerSummary) {
+                                            continue;
+                                        }
+
+                                        $pricingData = $offerSummary['pricing'] ?? [];
+                                        $amount = (float) ($pricingData['payable_total'] ?? $pricingData['total_amount'] ?? 0);
+                                        $currency = $offerSummary['currency'] ?? $currencyFallback;
+                                        $isActive = $currentSort === $key;
+                                        $btnClasses = $isActive
+                                            ? 'border-indigo-500 bg-indigo-50 text-indigo-900 shadow'
+                                            : 'border-slate-200 bg-white/80 text-slate-800 hover:border-indigo-300';
+                                        $label = $sortLabels[$key] ?? \Illuminate\Support\Str::title(str_replace('_', ' ', $key));
+                                    @endphp
+                                    <button
+                                        type="button"
+                                        class="rounded-xl border px-3 py-3 text-left shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 {{ $btnClasses }}"
+                                        data-stat-card
+                                        data-stat-type="{{ $key }}"
+                                        onclick="setSort('{{ $key }}')"
+                                        aria-pressed="{{ $isActive ? 'true' : 'false' }}"
+                                    >
+                                        <p class="text-xs uppercase tracking-wide text-slate-500">{{ $label }}</p>
+                                        <p class="text-lg font-bold text-slate-900" data-stat-value data-currency="{{ $currency }}" data-amount="{{ $amount }}">
+                                            {{ $currency }} {{ number_format($amount, 2) }}
+                                        </p>
+                                        <p class="text-[11px] text-slate-500">{{ $summaryCardConfig[$key] ?? '' }}</p>
+                                    </button>
                                 @endforeach
                             </div>
                         @endif
@@ -473,7 +494,7 @@
                                 No flight offers were found for the selected criteria. Try adjusting the dates, airports, or airline filters.
                             </div>
                         @else
-                            <div class="space-y-4">
+                            <div class="space-y-4" data-offer-list>
                                 @foreach ($offers as $offer)
                                 @php
                                     $tokenPayload = base64_encode(json_encode([
@@ -494,28 +515,31 @@
                                             'passengers' => $offer['passenger_summary'] ?? ($offer['pricing']['passengers'] ?? []),
                                         ],
                                     ], JSON_UNESCAPED_SLASHES) ?: '');
+
+                                    $pricingData = $offer['pricing'] ?? [];
+                                    $ndc = $pricingData['ndc'] ?? [];
+                                    $baseFare = $ndc['base_amount'] ?? ($pricingData['base_amount'] ?? 0);
+                                    $taxes = $ndc['tax_amount'] ?? ($pricingData['tax_amount'] ?? 0);
+                                    $adjustments = $pricingData['components']['adjustments'] ?? round(($pricingData['payable_total'] ?? 0) - ($baseFare + $taxes), 2);
+                                    $engineUsed = data_get($pricingData, 'engine.used', false);
+                                    $rulesApplied = $pricingData['rules_applied'] ?? [];
+                                    $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
+                                    $currency = $offer['currency'] ?? $currencyFallback;
+                                    $primaryCarrier = strtoupper($offer['primary_carrier'] ?? $offer['owner'] ?? '');
+                                    $displayCarrier = $offer['airline_name'] ?? ($offer['primary_carrier'] ?? $offer['owner']);
+                                    $totalPayable = (float) ($pricingData['payable_total'] ?? $pricingData['total_amount'] ?? 0);
+                                    $shouldHideInitial = !empty($preselectedAirlines) && !in_array($primaryCarrier, $preselectedAirlines, true);
                                 @endphp
 
-                                <div class="flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+                                <div class="{{ $shouldHideInitial ? 'hidden ' : '' }}flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" data-offer-card data-airline-code="{{ $primaryCarrier }}" data-offer-price="{{ $totalPayable }}" data-offer-currency="{{ $currency }}">
                                     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        @php
-            $pricingData = $offer['pricing'] ?? [];
-            $ndc = $pricingData['ndc'] ?? [];
-            $baseFare = $ndc['base_amount'] ?? ($pricingData['base_amount'] ?? 0);
-            $taxes = $ndc['tax_amount'] ?? ($pricingData['tax_amount'] ?? 0);
-            $adjustments = $pricingData['components']['adjustments'] ?? round(($pricingData['payable_total'] ?? 0) - ($baseFare + $taxes), 2);
-            $engineUsed = data_get($pricingData, 'engine.used', false);
-            $rulesApplied = $pricingData['rules_applied'] ?? [];
-            $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
-            $currency = $offer['currency'] ?? $currencyFallback;
-        @endphp
                                             <div class="flex items-center gap-3">
                                                 <div class="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-sm font-semibold text-slate-700">
-                                                    {{ \Illuminate\Support\Str::limit($offer['airline_name'] ?? ($offer['primary_carrier'] ?? $offer['owner']), 2, '') }}
+                                                    {{ \Illuminate\Support\Str::limit($displayCarrier, 2, '') }}
                                                 </div>
                                                 <div>
                                                     <p class="text-sm font-semibold text-indigo-700">
-                                                        {{ $offer['airline_name'] ?? ($offer['primary_carrier'] ?? $offer['owner']) }}
+                                                        {{ $displayCarrier }}
                                                     </p>
                                                     <p class="text-xs text-slate-500">
                                                         {{ $offer['departure_date'] }}
@@ -527,7 +551,7 @@
                                             </div>
                                             <div class="flex items-center gap-3 text-right">
                                                 <div class="text-lg font-bold text-slate-900">
-                                                    {{ $currency }} {{ number_format($pricingData['payable_total'] ?? 0, 2) }}
+                                                    {{ $currency }} {{ number_format($totalPayable, 2) }}
                                                 </div>
                                                 <div class="text-[11px] text-slate-500">
                                                     <div>Base: {{ $currency }} {{ number_format($baseFare, 2) }}</div>
@@ -639,6 +663,10 @@
                             @endif
                         </div>
                         @endforeach
+                            </div>
+                            <div class="rounded border border-yellow-200 bg-yellow-50 p-8 text-center text-yellow-900 {{ $offersCount > 0 ? 'hidden' : '' }}" data-filter-no-results>
+                                No flight offers match the selected airlines.
+                            </div>
                     </div>
                 @endif
             @else
@@ -1161,6 +1189,18 @@
                 }
             }
 
+            window.setSort = function(option) {
+                const sortInput = document.getElementById('sortInput');
+                const form = document.getElementById('flight-search-form');
+
+                if (!sortInput || !form) {
+                    return;
+                }
+
+                sortInput.value = option;
+                form.submit();
+            };
+
             const scrollTargetId = @json($scrollTarget);
             const scrollToResults = @json($searchPerformed);
             document.addEventListener('DOMContentLoaded', () => {
@@ -1169,6 +1209,7 @@
                 const returnWrapper = document.getElementById('return_date_wrapper');
                 const returnInput = document.getElementById('return_date');
                 const swapRoutesButton = document.getElementById('swap_routes');
+                const sortInput = document.getElementById('sortInput');
 
                 const setActiveTripType = (value) => {
                     if (!tripTypeInput) {
@@ -1238,6 +1279,9 @@
                             if (window.AirportSelectorManager) {
                                 window.AirportSelectorManager.refreshAll();
                             }
+                            if (sortInput) {
+                                sortInput.value = sortInput.defaultValue || 'best';
+                            }
                         }, 0);
                     });
                 }
@@ -1264,26 +1308,9 @@
                     new CheckboxDropdown(element);
                 });
 
-                document.querySelectorAll('[data-clear-airline-filters]').forEach((button) => {
-                    button.addEventListener('click', () => {
-                        const form = button.closest('form');
-
-                        if (!form) {
-                            return;
-                        }
-
-                        form.querySelectorAll('input[name="selected_airlines[]"]').forEach((checkbox) => {
-                            if (checkbox instanceof HTMLInputElement) {
-                                checkbox.checked = false;
-                            }
-                        });
-
-                        form.submit();
-                    });
-                });
-
                 document.querySelectorAll('[data-airline-search]').forEach((input) => {
-                    const list = input.closest('form')?.querySelector('[data-airline-list]');
+                    const wrapper = input.closest('[data-airline-filter-wrapper]');
+                    const list = wrapper ? wrapper.querySelector('[data-airline-list]') : null;
                     if (!list) {
                         return;
                     }
@@ -1307,6 +1334,199 @@
 
                     input.addEventListener('input', () => render(input.value));
                 });
+
+                const setupAirlineFilters = () => {
+                    const filterCheckboxes = Array.from(document.querySelectorAll('[data-airline-filter]'));
+                    if (filterCheckboxes.length === 0) {
+                        return;
+                    }
+
+                    const offerCards = Array.from(document.querySelectorAll('[data-offer-card]'));
+                    const summaryTarget = document.querySelector('[data-airline-filter-summary]');
+                    const summaryDefault = summaryTarget?.dataset.defaultText || 'Showing all airlines';
+                    const selectionCount = document.querySelector('[data-airline-selection-count]');
+                    const countTarget = document.querySelector('[data-offer-count]');
+                    const statsContainer = document.querySelector('[data-offer-stats]');
+                    const statsCards = statsContainer ? Array.from(statsContainer.querySelectorAll('[data-stat-card]')) : [];
+                    const emptyState = document.querySelector('[data-filter-no-results]');
+                    const flexibleLinks = Array.from(document.querySelectorAll('[data-flexible-range-link]'));
+
+                    const formatAmount = (value) => {
+                        const number = Number(value);
+                        if (!Number.isFinite(number)) {
+                            return value;
+                        }
+
+                        return number.toLocaleString(undefined, {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2,
+                        });
+                    };
+
+                    const updateStats = (visibleOffers) => {
+                        if (!statsContainer) {
+                            return;
+                        }
+
+                        if (visibleOffers.length === 0) {
+                            statsContainer.classList.add('hidden');
+                            return;
+                        }
+
+                        statsContainer.classList.remove('hidden');
+
+                        const pricedOffers = visibleOffers.filter((offer) => Number.isFinite(offer.price));
+
+                        if (pricedOffers.length === 0) {
+                            statsContainer.classList.add('hidden');
+                            return;
+                        }
+
+                        const sorted = pricedOffers
+                            .slice()
+                            .sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+                        const best = sorted[0] ?? null;
+                        const next = sorted[1] ?? null;
+                        const stats = {
+                            best,
+                            cheapest: best,
+                            next_best: next ?? best,
+                        };
+
+                        statsCards.forEach((card) => {
+                            const type = card.dataset.statType;
+                            const stat = type ? stats[type] : null;
+
+                            if (!stat) {
+                                card.classList.add('hidden');
+                                return;
+                            }
+
+                            card.classList.remove('hidden');
+
+                            const valueTarget = card.querySelector('[data-stat-value]');
+                            if (valueTarget) {
+                                const rawAmount = Number(stat.price ?? valueTarget.dataset.amount ?? 0);
+                                const amount = Number.isFinite(rawAmount) ? rawAmount : 0;
+                                const currency = stat.currency || valueTarget.dataset.currency || '';
+                                valueTarget.dataset.amount = String(amount);
+                                valueTarget.dataset.currency = currency;
+                                const formatted = formatAmount(amount);
+                                valueTarget.textContent = currency ? `${currency} ${formatted}` : formatted;
+                            }
+                        });
+                    };
+
+                    const updateHistory = (codes) => {
+                        if (!window.history || typeof window.history.replaceState !== 'function') {
+                            return;
+                        }
+
+                        try {
+                            const url = new URL(window.location.href);
+                            url.searchParams.delete('selected_airlines[]');
+                            codes.forEach((code) => url.searchParams.append('selected_airlines[]', code));
+                            window.history.replaceState({}, document.title, url.toString());
+                        } catch (error) {
+                            // Ignore history errors on older browsers.
+                        }
+                    };
+
+                    const buildUrlWithSelection = (href, codes) => {
+                        try {
+                            const url = new URL(href, window.location.origin);
+                            url.searchParams.delete('selected_airlines[]');
+                            codes.forEach((code) => url.searchParams.append('selected_airlines[]', code));
+                            return url.toString();
+                        } catch (error) {
+                            return href;
+                        }
+                    };
+
+                    const updateFlexibleLinks = (codes) => {
+                        if (flexibleLinks.length === 0) {
+                            return;
+                        }
+
+                        flexibleLinks.forEach((link) => {
+                            const baseHref = link.getAttribute('data-base-href') || link.getAttribute('href');
+                            if (!baseHref) {
+                                return;
+                            }
+
+                            const nextHref = buildUrlWithSelection(baseHref, codes);
+                            link.setAttribute('href', nextHref);
+                        });
+                    };
+
+                    const getSelectedCodes = () => filterCheckboxes
+                        .filter((checkbox) => checkbox.checked)
+                        .map((checkbox) => (checkbox.value || '').toUpperCase())
+                        .filter((code) => code !== '');
+
+                    const applyFilters = () => {
+                        const selectedCodes = getSelectedCodes();
+                        const visibleOffers = [];
+
+                        offerCards.forEach((card) => {
+                            const code = (card.dataset.airlineCode || '').toUpperCase();
+                            const matches = selectedCodes.length === 0 || selectedCodes.includes(code);
+                            card.classList.toggle('hidden', !matches);
+
+                            if (matches) {
+                                const rawPrice = Number(card.dataset.offerPrice ?? '0');
+                                const price = Number.isFinite(rawPrice) ? rawPrice : null;
+                                const currency = card.dataset.offerCurrency || '';
+                                visibleOffers.push({ price, currency });
+                            }
+                        });
+
+                        if (countTarget) {
+                            const count = visibleOffers.length;
+                            const label = count === 1 ? 'result' : 'results';
+                            const sortLabel = countTarget.dataset.sortLabel || 'Best';
+                            countTarget.textContent = `${count} ${label} sorted by ${sortLabel}`;
+                        }
+
+                        if (summaryTarget) {
+                            summaryTarget.textContent = selectedCodes.length > 0
+                                ? `Filtered: ${selectedCodes.join(', ')}`
+                                : summaryDefault;
+                        }
+
+                        if (selectionCount) {
+                            selectionCount.textContent = selectedCodes.length === 0
+                                ? 'All'
+                                : `${selectedCodes.length} selected`;
+                        }
+
+                        if (emptyState) {
+                            emptyState.classList.toggle('hidden', visibleOffers.length > 0);
+                        }
+
+                        updateStats(visibleOffers);
+                        updateHistory(selectedCodes);
+                        updateFlexibleLinks(selectedCodes);
+                    };
+
+                    filterCheckboxes.forEach((checkbox) => {
+                        checkbox.addEventListener('change', applyFilters);
+                    });
+
+                    document.querySelectorAll('[data-clear-airline-filters]').forEach((button) => {
+                        button.addEventListener('click', (event) => {
+                            event.preventDefault();
+                            filterCheckboxes.forEach((checkbox) => {
+                                checkbox.checked = false;
+                            });
+                            applyFilters();
+                        });
+                    });
+
+                    applyFilters();
+                };
+
+                setupAirlineFilters();
 
             });
         </script>

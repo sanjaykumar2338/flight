@@ -29,6 +29,12 @@ class FlightSearchController extends Controller
         $currencyFallback = $this->detectCurrency($request);
         $searchData = null;
         $dateRangeSummaries = collect();
+        $summaryOffers = [
+            'best' => null,
+            'cheapest' => null,
+            'next_best' => null,
+        ];
+        $sortOption = $this->normalizeSortOption($request->input('sort'));
 
         if ($request->filled('ref')) {
             session(['ref' => trim((string) $request->input('ref'))]);
@@ -51,7 +57,7 @@ class FlightSearchController extends Controller
         if ($request->hasSearchCriteria()) {
             try {
                 $searchData = FlightSearchData::fromArray($request->validated());
-                $searchResults = $this->travelNdcService->searchFlights($searchData, $flexibleDays, $selectedAirlines);
+                $searchResults = $this->travelNdcService->searchFlights($searchData, $flexibleDays, []);
                 $passengerSummary = $this->buildPassengerSummary($searchData);
 
                 $availableAirlines = collect($searchResults['airlines'])
@@ -61,14 +67,7 @@ class FlightSearchController extends Controller
                     ->values()
                     ->all();
 
-                $offers = collect($searchResults['offers'])
-                    ->when(!empty($selectedAirlines), function ($collection) use ($selectedAirlines) {
-                        $filters = array_map('strtoupper', $selectedAirlines);
-
-                        return $collection->filter(function ($offer) use ($filters) {
-                            return in_array(strtoupper(Arr::get($offer, 'primary_carrier')), $filters, true);
-                        });
-                    })
+                $allOffers = collect($searchResults['offers'])
                     ->map(function (array $offer) use ($searchData, $passengerSummary) {
                         $pricing = Arr::get($offer, 'pricing', []);
                         $carrier = trim((string) Arr::get($offer, 'primary_carrier', Arr::get($offer, 'owner', '')));
@@ -109,11 +108,15 @@ class FlightSearchController extends Controller
 
                 $dateRangeSummaries = $this->buildDateRangeSummaries(
                     $searchData,
-                    $offers,
+                    $allOffers,
                     $flexibleDays,
                     $request,
                     $currencyFallback
                 );
+
+                $offers = $this->filterOffersForSelectedRange($allOffers, $searchData);
+                [$summaryOffers, $sortedOffers] = $this->prepareSummaryOffers($offers);
+                $offers = $this->applySortOption($sortedOffers, $sortOption);
             } catch (TravelNdcException $exception) {
                 $errorMessage = $exception->getMessage();
             }
@@ -137,6 +140,7 @@ class FlightSearchController extends Controller
                 'children' => $request->input('children', 0),
                 'infants' => $request->input('infants', 0),
                 'cabin_class' => $request->input('cabin_class', 'ECONOMY'),
+                'sort' => $sortOption,
             ],
             'selectedAirlines' => $selectedAirlines,
             'airlineOptions' => $airlineOptions,
@@ -145,6 +149,8 @@ class FlightSearchController extends Controller
             'offers' => $offers,
             'errorMessage' => $errorMessage,
             'dateRangeSummaries' => $dateRangeSummaries,
+            'summaryOffers' => $summaryOffers,
+            'sortOption' => $sortOption,
             'pricedOffer' => $pricedOffer,
             'pricedBooking' => $pricedBooking,
             'bookingCreated' => $bookingCreated,
@@ -208,6 +214,86 @@ class FlightSearchController extends Controller
                 ];
             })
             ->values();
+    }
+
+    /**
+     * @param Collection<int, array<string, mixed>> $offers
+     */
+    private function filterOffersForSelectedRange(Collection $offers, FlightSearchData $searchData): Collection
+    {
+        $activeDepartureDate = $searchData->departureDate->toDateString();
+
+        return $offers
+            ->filter(function (array $offer) use ($activeDepartureDate) {
+                $offerDeparture = Arr::get($offer, 'departure_date');
+
+                if ($offerDeparture !== null) {
+                    return $offerDeparture === $activeDepartureDate;
+                }
+
+                return (int) Arr::get($offer, 'day_offset', 0) === 0;
+            })
+            ->values();
+    }
+
+    /**
+     * @return array{0: array{best: array<string, mixed>|null, cheapest: array<string, mixed>|null, next_best: array<string, mixed>|null}, 1: Collection<int, array<string, mixed>>}
+     */
+    private function prepareSummaryOffers(Collection $offers): array
+    {
+        $sorted = $offers
+            ->sortBy(fn ($offer) => $this->getOfferPayableTotal($offer))
+            ->values();
+
+        $cheapest = $sorted->first();
+        $nextBest = $sorted->get(1);
+
+        return [
+            [
+                'best' => $cheapest,
+                'cheapest' => $cheapest,
+                'next_best' => $nextBest,
+            ],
+            $sorted,
+        ];
+    }
+
+    private function applySortOption(Collection $offers, string $sortOption): Collection
+    {
+        if ($offers->isEmpty()) {
+            return $offers;
+        }
+
+        if ($sortOption === 'next_best') {
+            $nextBest = $offers->get(1);
+
+            if (!$nextBest) {
+                return $offers;
+            }
+
+            $remaining = $offers
+                ->reject(fn ($offer, $index) => $index === 1)
+                ->values();
+
+            return collect([$nextBest])->merge($remaining)->values();
+        }
+
+        return $offers;
+    }
+
+    private function getOfferPayableTotal(array $offer): float
+    {
+        $pricing = $offer['pricing'] ?? [];
+
+        return (float) ($pricing['payable_total'] ?? $pricing['total_amount'] ?? 0.0);
+    }
+
+    private function normalizeSortOption(?string $value): string
+    {
+        $normalized = strtolower((string) $value);
+        $allowed = ['best', 'cheapest', 'next_best'];
+
+        return in_array($normalized, $allowed, true) ? $normalized : 'best';
     }
 
     private function buildPassengerSummary(FlightSearchData $searchData): array
