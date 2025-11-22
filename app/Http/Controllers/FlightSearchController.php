@@ -188,7 +188,7 @@ class FlightSearchController extends Controller
             ->all();
 
         return collect(range(-$flexibleDays, $flexibleDays))
-            ->map(function (int $offset) use ($baseDeparture, $baseReturn, $offers, $queryBase, $currencyFallback) {
+            ->map(function (int $offset) use ($baseDeparture, $baseReturn, $offers, $queryBase, $currencyFallback, $activeOffset) {
                 $start = $baseDeparture->copy()->addDays($offset);
                 $end = $baseReturn ? $baseReturn->copy()->addDays($offset) : null;
 
