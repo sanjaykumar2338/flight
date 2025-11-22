@@ -699,7 +699,6 @@
                             </div>
                         @endif
                     </div>
-                @endif
             @else
                 <div class="rounded border border-gray-200 bg-white p-8 text-center text-gray-500">
                     Search for flights to see available offers.
