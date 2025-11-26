@@ -1089,7 +1089,10 @@ class TravelNdcService
         $orderId = $this->firstNodeValue($xpath, [
             '//ns:OrderViewRS//ns:OrderID',
             '//ns:OrderCreateRS//ns:OrderID',
+            '//ns:OrderReference//ns:OrderID',
+            '//ns:OrderView//ns:OrderID',
             '//ns:Order//ns:OrderID',
+            '//ns:BookingReferenceID',
         ]);
 
         if (!$orderId) {
@@ -1102,8 +1105,10 @@ class TravelNdcService
         if (!$orderId) {
             // Namespace-agnostic fallback in case the response uses unexpected prefixes.
             $orderId = $this->firstNodeValue($xpath, [
+                '//*[local-name()="OrderReference"]/*[local-name()="OrderID"]',
                 '//*[local-name()="OrderID"]',
                 '//*[local-name()="Order"]/@OrderID',
+                '//*[local-name()="BookingReferenceID"]',
             ]);
         }
 
@@ -1117,7 +1122,10 @@ class TravelNdcService
 
         return [
             'order_id' => $orderId,
-            'response_id' => $this->firstNodeValue($xpath, ['//ns:ResponseID']),
+            'response_id' => $this->firstNodeValue($xpath, [
+                '//ns:ResponseID',
+                '//*[local-name()="ResponseID"]',
+            ]),
             'raw_response' => $xmlContent,
         ];
     }
