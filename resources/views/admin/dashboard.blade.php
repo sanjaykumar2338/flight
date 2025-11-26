@@ -115,9 +115,6 @@
                     <a href="{{ route('admin.pricing.index') }}" class="text-sm font-semibold text-indigo-600 hover:text-indigo-500">
                         Manage Pricing Rules →
                     </a>
-                    <a href="{{ route('admin.airline-commissions.index') }}" class="text-xs font-semibold text-gray-500 hover:text-gray-700">
-                        Legacy commissions
-                    </a>
                 </div>
             </div>
         </div>

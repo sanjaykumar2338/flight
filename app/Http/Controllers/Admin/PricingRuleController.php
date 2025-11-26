@@ -57,16 +57,33 @@ class PricingRuleController extends Controller
                 ->sort()
                 ->values()
                 ->all(),
+            // Keep usage creation simple: only commission rules can be created from the UI.
             'usage_options' => [
                 'commission_base' => 'Commission from base price',
+                'commission_discount_base' => 'Commission with discount from base price',
                 'discount_base' => 'Discount from base price',
                 'discount_total_promo' => 'Discount from total price & promo code',
-                'commission_discount_base' => 'Commission with discount from base price',
+            ],
+            'creation_usage_options' => [
+                'commission_base' => 'Commission from base price',
             ],
             'travel_types' => DB::table('pricing_dropdown_options')->where('type', 'travel_types')->orderBy('sort_order')->pluck('label', 'value')->toArray(),
             'fare_types' => DB::table('pricing_dropdown_options')->where('type', 'fare_types')->orderBy('sort_order')->pluck('label', 'value')->toArray(),
             'cabin_classes' => DB::table('pricing_dropdown_options')->where('type', 'cabin_classes')->orderBy('sort_order')->pluck('label', 'value')->toArray(),
         ];
+
+        $commissionOverview = PricingRule::query()
+            ->active()
+            ->whereIn('usage', [
+                PricingRule::USAGE_COMMISSION_BASE,
+                PricingRule::USAGE_COMMISSION_DISCOUNT_BASE,
+            ])
+            ->orderBy('priority')
+            ->orderBy('id')
+            ->get()
+            ->groupBy(fn (PricingRule $rule) => $rule->carrier ?: '__ALL__')
+            ->map(fn ($group) => $group->first())
+            ->values();
 
         return view('admin.pricing.index', [
             'rules' => $rules,
@@ -75,6 +92,7 @@ class PricingRuleController extends Controller
             'options' => $options,
             'featureEnabled' => config('pricing.rules.enabled'),
             'tab' => $request->input('tab', 'rules'),
+            'commissionOverview' => $commissionOverview,
         ]);
     }
 

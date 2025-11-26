@@ -1,5 +1,6 @@
 @php
     $usageOptions = $options['usage_options'] ?? [];
+    $creationUsageOptions = $options['creation_usage_options'] ?? $usageOptions;
     $travelTypes = $options['travel_types'] ?? [];
     $fareTypes = $options['fare_types'] ?? [];
     $cabinClasses = $options['cabin_classes'] ?? [];
@@ -45,17 +46,6 @@
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-3">
-                        <a href="{{ route('admin.airline-commissions.index') }}"
-                           class="inline-flex items-center rounded border border-gray-200 bg-white px-3 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-100">
-                            Legacy commissions
-                        </a>
-                        <form method="POST" action="{{ route('admin.pricing.import-legacy') }}">
-                            @csrf
-                            <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
-                            <button type="submit" class="inline-flex items-center rounded border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-semibold text-indigo-600 hover:bg-indigo-100">
-                                Import legacy commissions
-                            </button>
-                        </form>
                         <button
                             type="button"
                             class="inline-flex items-center rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500"
@@ -66,336 +56,125 @@
                     </div>
                 </div>
 
-                <div class="mt-6 border-b border-gray-200">
-                    <nav class="-mb-px flex gap-6 text-sm font-medium">
-                        <a href="{{ route('admin.pricing.index', array_merge(request()->except('page'), ['tab' => 'rules'])) }}"
-                           class="px-1 pb-3 {{ $tab === 'rules' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700' }}">
-                            Rules
-                        </a>
-                        <a href="{{ route('admin.pricing.index', array_merge(request()->except('page'), ['tab' => 'audit'])) }}"
-                           class="px-1 pb-3 {{ $tab === 'audit' ? 'border-b-2 border-indigo-500 text-indigo-600' : 'text-gray-500 hover:text-gray-700' }}">
-                            Audit
-                        </a>
-                    </nav>
-                </div>
-
-                <div class="mt-6">
-                    @if (session('status'))
-                        <div class="mb-4 rounded border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm text-emerald-700">
-                            {{ session('status') }}
-                        </div>
-                    @endif
-
-                    @if ($tab === 'audit')
-                        <div class="rounded border border-dashed border-gray-300 bg-gray-50 p-8 text-center text-sm text-gray-600">
-                            Audit timeline coming soon. We will track CRUD events once the primary rules workflow is verified.
-                        </div>
-                    @else
-                        <div class="grid gap-6 lg:grid-cols-[320px,1fr]">
-                            <form method="GET" action="{{ route('admin.pricing.index') }}" class="space-y-4">
-                                <input type="hidden" name="tab" value="rules">
-                                <div>
-                                    <h3 class="text-sm font-semibold text-gray-700">Filters</h3>
-                                    <p class="text-xs text-gray-500">Refine rules by carrier, usage, booking class, and travel attributes.</p>
-                                </div>
-
-                                <div>
-                                    <x-input-label for="filter_carrier" value="Carrier" />
-                                    <input id="filter_carrier" type="text" name="carrier" maxlength="3"
-                                           value="{{ $filters['carrier'] }}"
-                                           list="pricing-carrier-options"
-                                           class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                    <datalist id="pricing-carrier-options">
-                                        @foreach ($carrierOptions as $carrier)
-                                            <option value="{{ $carrier }}"></option>
-                                        @endforeach
-                                    </datalist>
-                                </div>
-
-                                <div>
-                                    <x-input-label for="filter_usage" value="Usage" />
-                                    <select id="filter_usage" name="usage" class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                        <option value="">--- choose ---</option>
-                                        @foreach ($usageOptions as $value => $label)
-                                            <option value="{{ $value }}" @selected($filters['usage'] === $value)>{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <x-input-label for="filter_origin" value="Origin" />
-                                        <input id="filter_origin" type="text" name="origin" maxlength="3"
-                                               value="{{ $filters['origin'] }}" class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                    </div>
-                                    <div>
-                                        <x-input-label for="filter_destination" value="Destination" />
-                                        <input id="filter_destination" type="text" name="destination" maxlength="3"
-                                               value="{{ $filters['destination'] }}" class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <x-input-label for="filter_both_ways" value="Both ways" />
-                                        <select id="filter_both_ways" name="both_ways" class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                            <option value="">--- choose ---</option>
-                                            <option value="1" @selected($filters['both_ways'] === true)>Yes</option>
-                                            <option value="0" @selected($filters['both_ways'] === false)>No</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <x-input-label for="filter_travel_type" value="Travel type" />
-                                        <select id="filter_travel_type" name="travel_type" class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                            <option value="">--- choose ---</option>
-                                            @foreach ($travelTypes as $value => $label)
-                                                <option value="{{ $value }}" @selected($filters['travel_type'] === $value)>{{ $label }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <x-input-label for="filter_cabin_class" value="Cabin class" />
-                                        <select id="filter_cabin_class" name="cabin_class" class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                            <option value="">--- choose ---</option>
-                                            @foreach ($cabinClasses as $value => $label)
-                                                <option value="{{ $value }}" @selected($filters['cabin_class'] === $value)>{{ $label }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <x-input-label for="filter_fare_type" value="Fare type" />
-                                        <select id="filter_fare_type" name="fare_type" class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                            <option value="">--- choose ---</option>
-                                            @foreach ($fareTypes as $value => $label)
-                                                <option value="{{ $value }}" @selected($filters['fare_type'] === $value)>{{ $label }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <x-input-label for="filter_booking_class_rbd" value="Booking class (RBD)" />
-                                        <input id="filter_booking_class_rbd" type="text" name="booking_class_rbd" maxlength="10"
-                                               value="{{ $filters['booking_class_rbd'] }}" class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                    </div>
-                                    <div>
-                                        <x-input-label for="filter_booking_class_usage" value="Usage of booking classes" />
-                                        <select id="filter_booking_class_usage" name="booking_class_usage" class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                            <option value="">--- choose ---</option>
-                                            @foreach ($bookingClassUsageOptions as $value => $label)
-                                                <option value="{{ $value }}" @selected($filters['booking_class_usage'] === $value)>{{ $label }}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <x-input-label for="filter_passenger_types" value="Passenger types" />
-                                    <select id="filter_passenger_types" name="passenger_types[]" multiple size="4"
-                                            class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                        @foreach (array_unique($passengerTypeOptions) as $type)
-                                            <option value="{{ $type }}" @selected(in_array($type, $filters['passenger_types'] ?? [], true))>{{ $type }}</option>
-                                        @endforeach
-                                    </select>
-                                    <p class="mt-1 text-xs text-gray-500">Hold Cmd/Ctrl to select multiple types.</p>
-                                </div>
-
-                                <div class="space-y-3">
-                                    <div>
-                                        <x-input-label value="Sales window" />
-                                        <div class="mt-1 grid grid-cols-2 gap-3">
-                                            <input type="date" name="sales_since" value="{{ $filters['sales_range']['since'] }}" class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                            <input type="date" name="sales_till" value="{{ $filters['sales_range']['till'] }}" class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <x-input-label value="Departures window" />
-                                        <div class="mt-1 grid grid-cols-2 gap-3">
-                                            <input type="date" name="departures_since" value="{{ $filters['departures_range']['since'] }}" class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                            <input type="date" name="departures_till" value="{{ $filters['departures_range']['till'] }}" class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <x-input-label value="Returns window" />
-                                        <div class="mt-1 grid grid-cols-2 gap-3">
-                                            <input type="date" name="returns_since" value="{{ $filters['returns_range']['since'] }}" class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                            <input type="date" name="returns_till" value="{{ $filters['returns_range']['till'] }}" class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <x-input-label for="filter_promo_code" value="Promo code" />
-                                    <input id="filter_promo_code" type="text" name="promo_code" maxlength="32"
-                                           value="{{ $filters['promo_code'] }}" class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                </div>
-
-                                <div>
-                                    <x-input-label for="filter_active" value="Active" />
-                                    <select id="filter_active" name="active" class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                        <option value="">--- choose ---</option>
-                                        <option value="1" @selected($filters['active'] === true)>Active</option>
-                                        <option value="0" @selected($filters['active'] === false)>Inactive</option>
-                                    </select>
-                                </div>
-
-                                <div class="flex gap-3">
-                                    <x-primary-button>{{ __('Apply filters') }}</x-primary-button>
-                                    <a href="{{ route('admin.pricing.index', ['tab' => 'rules']) }}" class="text-sm font-semibold text-gray-600 hover:text-gray-800">
-                                        Remove filter
-                                    </a>
-                                </div>
-                            </form>
-
-                            <div class="overflow-hidden rounded border border-gray-200 bg-white shadow-sm">
-                                <div class="overflow-x-auto">
-                                    <table class="min-w-full divide-y divide-gray-200 text-sm">
-                                        <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-600">
-                                            <tr>
-                                                <th class="px-3 py-2 text-left">Id</th>
-                                                <th class="px-3 py-2 text-left">Priority</th>
-                                                <th class="px-3 py-2 text-left">Carrier</th>
-                                                <th class="px-3 py-2 text-left">Usage</th>
-                                                <th class="px-3 py-2 text-left">% / Flat / Fee</th>
-                                                <th class="px-3 py-2 text-left">Origin</th>
-                                                <th class="px-3 py-2 text-left">Destination</th>
-                                                <th class="px-3 py-2 text-left">Both ways</th>
-                                                <th class="px-3 py-2 text-left">Travel</th>
-                                                <th class="px-3 py-2 text-left">Booking class</th>
-                                                <th class="px-3 py-2 text-left">Cabin</th>
-                                                <th class="px-3 py-2 text-left">Fare type</th>
-                                                <th class="px-3 py-2 text-left">Sales window</th>
-                                                <th class="px-3 py-2 text-left">Departures</th>
-                                                <th class="px-3 py-2 text-left">Promo</th>
-                                                <th class="px-3 py-2 text-left">Active</th>
-                                                <th class="px-3 py-2 text-left">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-gray-100 bg-white">
-                                            @forelse ($rules as $rule)
-                                                @php
-                                                    $ruleData = [
-                                                        'id' => $rule->id,
-                                                        'priority' => $rule->priority,
-                                                        'carrier' => $rule->carrier,
-                                                        'usage' => $rule->usage,
-                                                        'usage_label' => $usageOptions[$rule->usage] ?? \Illuminate\Support\Str::headline(str_replace('_', ' ', $rule->usage ?? '')),
-                                                        'origin' => $rule->origin,
-                                                        'destination' => $rule->destination,
-                                                        'both_ways' => (bool) $rule->both_ways,
-                                                        'travel_type' => $rule->travel_type,
-                                                        'travel_type_label' => $travelTypes[$rule->travel_type] ?? ($rule->travel_type ?? '—'),
-                                                        'cabin_class' => $rule->cabin_class,
-                                                        'cabin_class_label' => $rule->cabin_class ?? '—',
-                                                        'booking_class_rbd' => $rule->booking_class_rbd,
-                                                        'booking_class_usage' => $rule->booking_class_usage,
-                                                        'booking_class_usage_label' => $bookingClassUsageOptions[$rule->booking_class_usage] ?? ($rule->booking_class_usage ?? '—'),
-                                                        'passenger_types' => $rule->passenger_types ?? [],
-                                                        'sales_since' => $rule->sales_since?->format('Y-m-d\TH:i'),
-                                                        'sales_till' => $rule->sales_till?->format('Y-m-d\TH:i'),
-                                                        'departures_since' => $rule->departures_since?->format('Y-m-d\TH:i'),
-                                                        'departures_till' => $rule->departures_till?->format('Y-m-d\TH:i'),
-                                                        'returns_since' => $rule->returns_since?->format('Y-m-d\TH:i'),
-                                                        'returns_till' => $rule->returns_till?->format('Y-m-d\TH:i'),
-                                                        'fare_type' => $rule->fare_type,
-                                                        'fare_type_label' => $fareTypes[$rule->fare_type] ?? ($rule->fare_type ?? '—'),
-                                                        'promo_code' => $rule->promo_code,
-                                                        'percent' => $rule->percent,
-                                                        'flat_amount' => $rule->flat_amount,
-                                                        'fee_percent' => $rule->fee_percent,
-                                                        'fixed_fee' => $rule->fixed_fee,
-                                                        'active' => (bool) $rule->active,
-                                                        'notes' => $rule->notes,
-                                                    ];
-                                                @endphp
-                                                <tr class="hover:bg-indigo-50/40">
-                                                    <td class="px-3 py-2 font-medium text-gray-800">#{{ $rule->id }}</td>
-                                                    <td class="px-3 py-2 text-gray-700">{{ $rule->priority }}</td>
-                                                    <td class="px-3 py-2 text-gray-700">{{ $rule->carrier ?? '—' }}</td>
-                                                    <td class="px-3 py-2 text-gray-700">
-                                                        {{ $usageOptions[$rule->usage] ?? \Illuminate\Support\Str::headline(str_replace('_', ' ', $rule->usage ?? '')) }}
-                                                    </td>
-                                                    <td class="px-3 py-2 text-gray-700">
-                                                        <div class="flex flex-col">
-                                                            <span>{{ $rule->percent !== null ? number_format((float) $rule->percent, 2).'%' : '—' }}</span>
-                                                            <span>{{ $rule->flat_amount !== null ? number_format((float) $rule->flat_amount, 2) : '—' }}</span>
-                                                            <span>{{ $rule->fee_percent !== null || $rule->fixed_fee !== null ? sprintf('%s / %s',
-                                                                $rule->fee_percent !== null ? number_format((float) $rule->fee_percent, 2).'%' : '—',
-                                                                $rule->fixed_fee !== null ? number_format((float) $rule->fixed_fee, 2) : '—'
-                                                            ) : '—' }}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-3 py-2 text-gray-700">{{ $rule->origin ?? '—' }}</td>
-                                                    <td class="px-3 py-2 text-gray-700">{{ $rule->destination ?? '—' }}</td>
-                                                    <td class="px-3 py-2">
-                                                        <span class="rounded-full px-2 py-1 text-xs font-semibold {{ $rule->both_ways ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600' }}">
-                                                            {{ $rule->both_ways ? 'Yes' : 'No' }}
-                                                        </span>
-                                                    </td>
-                                                    <td class="px-3 py-2 text-gray-700">{{ $travelTypes[$rule->travel_type] ?? ($rule->travel_type ?? '—') }}</td>
-                                                    <td class="px-3 py-2 text-gray-700">
-                                                        <div class="flex flex-col">
-                                                            <span>{{ $rule->booking_class_rbd ?? '—' }}</span>
-                                                            <span class="text-xs text-gray-500">{{ $bookingClassUsageOptions[$rule->booking_class_usage] ?? '—' }}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-3 py-2 text-gray-700">{{ $rule->cabin_class ?? '—' }}</td>
-                                                    <td class="px-3 py-2 text-gray-700">{{ $fareTypes[$rule->fare_type] ?? ($rule->fare_type ?? '—') }}</td>
-                                                    <td class="px-3 py-2 text-gray-700">
-                                                        <div class="flex flex-col text-xs">
-                                                            <span>{{ $rule->sales_since?->format('Y-m-d') ?? '—' }}</span>
-                                                            <span>{{ $rule->sales_till?->format('Y-m-d') ?? '—' }}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-3 py-2 text-gray-700">
-                                                        <div class="flex flex-col text-xs">
-                                                            <span>{{ $rule->departures_since?->format('Y-m-d') ?? '—' }}</span>
-                                                            <span>{{ $rule->departures_till?->format('Y-m-d') ?? '—' }}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td class="px-3 py-2 text-gray-700">{{ $rule->promo_code ?? '—' }}</td>
-                                                    <td class="px-3 py-2">
-                                                        <span class="rounded-full px-2 py-1 text-xs font-semibold {{ $rule->active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700' }}">
-                                                            {{ $rule->active ? 'Active' : 'Disabled' }}
-                                                        </span>
-                                                    </td>
-                                                    <td class="px-3 py-2 text-sm">
-                                                        <div class="flex flex-wrap gap-3 text-indigo-600">
-                                                            <button type="button" class="hover:underline" @click="openDetail(@js($ruleData))">Detail</button>
-                                                            <button type="button" class="hover:underline" @click="openEdit(@js($ruleData))">Edit</button>
-                                                            <button type="button" class="hover:underline" @click="openCopy(@js($ruleData))">Copy</button>
-                                                            <form method="POST" action="{{ route('admin.pricing.rules.destroy', $rule) }}" class="inline">
-                                                                @csrf
-                                                                @method('DELETE')
-                                                                <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
-                                                                <button type="submit" class="text-rose-600 hover:underline" onclick="return confirm('Delete pricing rule #{{ $rule->id }}?')">
-                                                                    Delete
-                                                                </button>
-                                                            </form>
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            @empty
-                                                <tr>
-                                                    <td colspan="15" class="px-3 py-6 text-center text-sm text-gray-500">
-                                                        No pricing rules found. Adjust filters or add a new rule.
-                                                    </td>
-                                                </tr>
-                                            @endforelse
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                <div class="border-t border-gray-200 bg-gray-50 px-3 py-2">
-                                    {{ $rules->links() }}
-                                </div>
+                @if (($commissionOverview ?? collect())->isNotEmpty())
+                    <div class="mt-6 rounded-lg border border-indigo-100 bg-indigo-50 p-4 text-indigo-900">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p class="text-sm font-semibold">Simple commission overview</p>
+                                <p class="text-xs text-indigo-800">First active commission rule per carrier, ordered by priority.</p>
                             </div>
+                            <span class="text-[11px] font-semibold text-indigo-700">Showing active commission rules only</span>
                         </div>
-                    @endif
+                        <div class="mt-3 overflow-x-auto rounded border border-indigo-100 bg-white shadow-sm">
+                            <table class="min-w-full divide-y divide-indigo-100 text-sm">
+                                <thead class="bg-indigo-50 text-xs uppercase tracking-wide text-indigo-700">
+                                    <tr>
+                                        <th class="px-3 py-2 text-left">Carrier</th>
+                                        <th class="px-3 py-2 text-left">% / Flat</th>
+                                        <th class="px-3 py-2 text-left">Usage</th>
+                                        <th class="px-3 py-2 text-left">Scope</th>
+                                        <th class="px-3 py-2 text-left">Priority</th>
+                                        <th class="px-3 py-2 text-left">Rule</th>
+                                        <th class="px-3 py-2 text-left">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-indigo-50">
+                                    @foreach ($commissionOverview as $rule)
+                                        @php
+                                            $usageLabel = $usageOptions[$rule->usage] ?? \Illuminate\Support\Str::headline(str_replace('_', ' ', $rule->usage ?? ''));
+                                            $carrierLabel = $rule->carrier ? $rule->carrier : 'All carriers';
+                                            $scope = $rule->origin || $rule->destination
+                                                ? ($rule->origin ?? 'Any') . ' → ' . ($rule->destination ?? 'Any')
+                                                : 'Any route';
+                                            if ($rule->both_ways) {
+                                                $scope .= ' (both ways)';
+                                            }
+                                            $bookingScope = $rule->booking_class_rbd
+                                                ? ($bookingClassUsageOptions[$rule->booking_class_usage] ?? 'Booking class filter')
+                                                : 'Any booking class';
+                                            $ruleData = [
+                                                'id' => $rule->id,
+                                                'priority' => $rule->priority,
+                                                'carrier' => $rule->carrier ?? '',
+                                                'all_carriers' => empty($rule->carrier),
+                                                'usage' => $rule->usage,
+                                                'usage_label' => $usageLabel,
+                                                'origin' => $rule->origin,
+                                                'destination' => $rule->destination,
+                                                'both_ways' => (bool) $rule->both_ways,
+                                                'travel_type' => $rule->travel_type,
+                                                'travel_type_label' => $travelTypes[$rule->travel_type] ?? ($rule->travel_type ?? '—'),
+                                                'cabin_class' => $rule->cabin_class,
+                                                'cabin_class_label' => $rule->cabin_class ?? '—',
+                                                'booking_class_rbd' => $rule->booking_class_rbd,
+                                                'booking_class_usage' => $rule->booking_class_usage,
+                                                'booking_class_usage_label' => $bookingClassUsageOptions[$rule->booking_class_usage] ?? ($rule->booking_class_usage ?? '—'),
+                                                'passenger_types' => $rule->passenger_types ?? [],
+                                                'sales_since' => $rule->sales_since?->format('Y-m-d\TH:i'),
+                                                'sales_till' => $rule->sales_till?->format('Y-m-d\TH:i'),
+                                                'departures_since' => $rule->departures_since?->format('Y-m-d\TH:i'),
+                                                'departures_till' => $rule->departures_till?->format('Y-m-d\TH:i'),
+                                                'returns_since' => $rule->returns_since?->format('Y-m-d\TH:i'),
+                                                'returns_till' => $rule->returns_till?->format('Y-m-d\TH:i'),
+                                                'fare_type' => $rule->fare_type,
+                                                'fare_type_label' => $fareTypes[$rule->fare_type] ?? ($rule->fare_type ?? '—'),
+                                                'promo_code' => $rule->promo_code,
+                                                'percent' => $rule->percent,
+                                                'flat_amount' => $rule->flat_amount,
+                                                'fee_percent' => $rule->fee_percent,
+                                                'fixed_fee' => $rule->fixed_fee,
+                                                'active' => (bool) $rule->active,
+                                                'notes' => $rule->notes,
+                                            ];
+                                        @endphp
+                                        <tr class="bg-white">
+                                            <td class="px-3 py-2 font-semibold text-gray-800">
+                                                @if ($rule->carrier)
+                                                    {{ $carrierLabel }}
+                                                @else
+                                                    <span class="inline-flex items-center rounded-full bg-indigo-100 px-2 py-1 text-xs font-semibold text-indigo-800">
+                                                        {{ $carrierLabel }}
+                                                    </span>
+                                                @endif
+                                            </td>
+                                            <td class="px-3 py-2 text-gray-700">
+                                                <div class="flex flex-col">
+                                                    <span>{{ $rule->percent !== null ? number_format((float) $rule->percent, 2) . '%' : '—' }}</span>
+                                                    <span>{{ $rule->flat_amount !== null ? number_format((float) $rule->flat_amount, 2) : '—' }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="px-3 py-2 text-gray-700">{{ $usageLabel }}</td>
+                                            <td class="px-3 py-2 text-gray-700">
+                                                <div class="flex flex-col text-xs">
+                                                    <span>{{ $scope }}</span>
+                                                    <span>{{ $bookingScope }}</span>
+                                                </div>
+                                            </td>
+                                            <td class="px-3 py-2 text-gray-700">#{{ $rule->priority }}</td>
+                                            <td class="px-3 py-2 text-gray-700">
+                                                <a href="{{ route('admin.pricing.index', array_merge(request()->except('page'), ['tab' => 'rules', 'carrier' => $rule->carrier ?? ''])) }}"
+                                                   class="text-indigo-600 hover:underline">
+                                                    View rule #{{ $rule->id }}
+                                                </a>
+                                            </td>
+                                            <td class="px-3 py-2 text-gray-700">
+                                                <button type="button"
+                                                    class="text-sm font-semibold text-indigo-600 hover:underline"
+                                                    @click="openEdit(@js($ruleData))">
+                                                    Edit
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                @endif
+
+                <div class="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-6 text-sm text-gray-700">
+                    <p class="font-semibold text-gray-800">Detailed rule list hidden</p>
+                    <p class="mt-1">To keep commissions simple, only the overview above is shown. Use “Add a rule” to create or update a commission.</p>
                 </div>
             </div>
 
@@ -425,9 +204,21 @@
                                        class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
                             </div>
                             <div>
-                                <x-input-label for="rule_carrier" value="Carrier" />
-                                <input id="rule_carrier" name="carrier" maxlength="3" x-model="$store.pricingRules.form.carrier"
-                                       class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                                <x-input-label for="rule_carrier" value="Carrier (leave blank for all carriers)" />
+                                <div class="flex flex-wrap items-center gap-3">
+                                    <input id="rule_carrier" name="carrier" maxlength="3" x-model="$store.pricingRules.form.carrier"
+                                           :disabled="$store.pricingRules.form.all_carriers"
+                                           x-on:input="$store.pricingRules.form.carrier = $event.target.value.toUpperCase()"
+                                           placeholder="e.g. EK"
+                                           class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-500" />
+                                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                               x-model="$store.pricingRules.form.all_carriers"
+                                               @change="if ($event.target.checked) { $store.pricingRules.form.carrier = ''; }">
+                                        Apply to all carriers
+                                    </label>
+                                </div>
+                                <p class="mt-1 text-xs text-gray-500">Turn off “all carriers” to target a specific airline code.</p>
                             </div>
                         </div>
 
@@ -436,10 +227,11 @@
                                 <x-input-label for="rule_usage" value="Usage" />
                                 <select id="rule_usage" name="usage" x-model="$store.pricingRules.form.usage"
                                         class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    @foreach ($usageOptions as $value => $label)
+                                    @foreach ($creationUsageOptions as $value => $label)
                                         <option value="{{ $value }}">{{ $label }}</option>
                                     @endforeach
                                 </select>
+                                <p class="mt-1 text-xs text-gray-500">Only simple commission rules can be created from this screen.</p>
                             </div>
                             <div>
                                 <x-input-label for="rule_fare_type" value="Fare type" />
@@ -635,7 +427,7 @@
                             </div>
                             <div class="grid grid-cols-3 gap-2">
                                 <dt class="text-gray-500">Carrier</dt>
-                                <dd class="col-span-2 font-semibold" x-text="$store.pricingRules.detail.carrier || '—'"></dd>
+                                <dd class="col-span-2 font-semibold" x-text="$store.pricingRules.detail.carrier || 'All carriers'"></dd>
                             </div>
                             <div class="grid grid-cols-3 gap-2">
                                 <dt class="text-gray-500">Usage</dt>
@@ -722,6 +514,7 @@
                             id: null,
                             priority: 0,
                             carrier: '',
+                            all_carriers: true,
                             usage: '{{ \App\Models\PricingRule::USAGE_COMMISSION_BASE }}',
                             origin: '',
                             destination: '',
@@ -764,17 +557,20 @@
                             openEdit(rule = {}) {
                                 this.mode = 'edit';
                                 this.form = Object.assign(defaults(), rule);
+                                this.form.all_carriers = !this.form.carrier;
                                 window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
                             },
                             openCopy(rule = {}) {
                                 this.mode = 'create';
                                 const data = Object.assign(defaults(), rule);
                                 data.id = null;
+                                data.all_carriers = !data.carrier;
                                 this.form = data;
                                 window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
                             },
                             openDetail(rule = {}) {
                                 this.detail = Object.assign(defaults(), rule);
+                                this.detail.all_carriers = !this.detail.carrier;
                                 window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-detail' }));
                             },
                             formAction() {

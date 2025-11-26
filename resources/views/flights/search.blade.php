@@ -114,6 +114,12 @@
         'cheapest' => 'Lowest fare available',
         'next_best' => 'Close alternative',
     ];
+    $ruleUsageLabels = [
+        \App\Models\PricingRule::USAGE_COMMISSION_BASE => 'Commission from base price',
+        \App\Models\PricingRule::USAGE_DISCOUNT_BASE => 'Discount from base price',
+        \App\Models\PricingRule::USAGE_DISCOUNT_TOTAL_PROMO => 'Discount from total price',
+        \App\Models\PricingRule::USAGE_COMMISSION_DISCOUNT_BASE => 'Commission & discount from base price',
+    ];
 @endphp
 
 <x-app-layout>
@@ -550,6 +556,35 @@
                                                     $engineUsed = data_get($pricingData, 'engine.used', false);
                                                     $rulesApplied = $pricingData['rules_applied'] ?? [];
                                                     $ruleCount = is_countable($rulesApplied) ? count($rulesApplied) : 0;
+                                                    $commissionRules = collect($rulesApplied)
+                                                        ->filter(function ($rule) {
+                                                            $kind = strtoupper((string) ($rule['kind'] ?? ''));
+                                                            $usage = strtolower((string) ($rule['usage'] ?? ''));
+                                                            $label = strtolower((string) ($rule['label'] ?? ''));
+
+                                                            return $kind === \App\Models\PricingRule::KIND_COMMISSION
+                                                                || \Illuminate\Support\Str::startsWith($usage, 'commission')
+                                                                || \Illuminate\Support\Str::contains($label, 'commission');
+                                                        })
+                                                        ->values();
+                                                    $commissionRule = $commissionRules->first();
+                                                    $commissionImpact = $commissionRule ? (float) ($commissionRule['impact_amount'] ?? 0) : 0.0;
+                                                    $commissionImpactLabel = $commissionRule
+                                                        ? (($commissionImpact >= 0 ? '+' : '-') . number_format(abs($commissionImpact), 2))
+                                                        : null;
+                                                    $commissionLabel = null;
+                                                    if ($commissionRule) {
+                                                        $usageKey = $commissionRule['usage'] ?? null;
+                                                        $usageLabel = $usageKey && isset($ruleUsageLabels[$usageKey]) ? $ruleUsageLabels[$usageKey] : null;
+                                                        $commissionLabel = $commissionRule['label']
+                                                            ?? ($commissionRule['id'] ? "Rule #{$commissionRule['id']}" : 'Commission');
+
+                                                        if ($usageLabel) {
+                                                            $commissionLabel .= " – {$usageLabel}";
+                                                        }
+                                                    } elseif ($engineUsed && $ruleCount > 0) {
+                                                        $commissionLabel = 'Commission rule not triggered';
+                                                    }
                                                     $currency = $offer['currency'] ?? $currencyFallback;
                                                     $primaryCarrier = strtoupper($offer['primary_carrier'] ?? $offer['owner'] ?? '');
                                                     $displayCarrier = $offer['airline_name'] ?? ($offer['primary_carrier'] ?? $offer['owner']);
@@ -592,6 +627,30 @@
                                                                     </button>
                                                                 </form>
                                                             </div>
+                                                    </div>
+
+                                                    <div class="flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+                                                        <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+                                                            {{ $ruleCount }} {{ \Illuminate\Support\Str::plural('rule', $ruleCount) }}
+                                                        </span>
+                                                        @if ($commissionRule)
+                                                            <span class="inline-flex items-center rounded-full bg-indigo-50 px-2 py-1 font-semibold text-indigo-700">
+                                                                Commission: {{ $commissionLabel }}
+                                                            </span>
+                                                            @if ($commissionImpactLabel !== null)
+                                                                <span class="inline-flex items-center rounded-full px-2 py-1 font-semibold {{ $commissionImpact >= 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700' }}">
+                                                                    Impact {{ $commissionImpactLabel }}
+                                                                </span>
+                                                            @endif
+                                                        @elseif ($engineUsed)
+                                                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-1 font-semibold text-amber-700">
+                                                                No commission rule matched
+                                                            </span>
+                                                        @else
+                                                            <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-1 font-semibold text-slate-700">
+                                                                Legacy pricing
+                                                            </span>
+                                                        @endif
                                                     </div>
 
                                                     <div class="space-y-2 text-sm text-gray-700">
