@@ -1100,6 +1100,18 @@ class TravelNdcService
         }
 
         if (!$orderId) {
+            // Namespace-agnostic fallback in case the response uses unexpected prefixes.
+            $orderId = $this->firstNodeValue($xpath, [
+                '//*[local-name()="OrderID"]',
+                '//*[local-name()="Order"]/@OrderID',
+            ]);
+        }
+
+        if (!$orderId) {
+            \Log::warning('OrderCreate response missing OrderID', [
+                'raw_response' => $xmlContent,
+            ]);
+
             throw new TravelNdcException('OrderCreate response did not include an OrderID.');
         }
 
