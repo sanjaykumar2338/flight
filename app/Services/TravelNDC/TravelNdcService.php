@@ -1080,6 +1080,20 @@ class TravelNdcService
             throw new TravelNdcException('Unable to parse OrderCreate response (invalid XML).');
         }
 
+        $root = $dom->documentElement;
+        if ($root instanceof DOMElement && strcasecmp($root->localName, 'error') === 0) {
+            $code = $root->getAttribute('code') ?: $root->getAttribute('Code');
+            $message = trim($root->textContent ?: 'Unknown TravelNDC error');
+
+            throw new TravelNdcException(
+                sprintf(
+                    'TravelNDC error: %s%s',
+                    $message,
+                    $code !== '' ? " ({$code})" : ''
+                )
+            );
+        }
+
         $xpath = new DOMXPath($dom);
         $namespace = $dom->documentElement?->namespaceURI ?? self::NAMESPACE_URI;
         $xpath->registerNamespace('ns', $namespace);
