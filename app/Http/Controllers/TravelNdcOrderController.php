@@ -46,7 +46,13 @@ class TravelNdcOrderController extends Controller
         try {
             $order = $this->travelNdcService->createOrder($offerPayload, [$passenger], $contact);
         } catch (TravelNdcException $exception) {
-            return $this->errorResponse($request, $exception->getMessage(), 422, true);
+            $message = $exception->getMessage();
+
+            if (stripos($message, 'responseid') !== false && stripos($message, 'expired') !== false) {
+                $message = 'This offer has expired. Please re-price or re-select the itinerary from search results to get a fresh response, then try again.';
+            }
+
+            return $this->errorResponse($request, $message, 422, true);
         }
 
         $booking->update([
