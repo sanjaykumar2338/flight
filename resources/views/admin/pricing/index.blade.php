@@ -9,8 +9,17 @@
         \App\Models\PricingRule::BOOKING_CLASS_USAGE_ONLY_LISTED => 'Must not contain other than listed classes',
         \App\Models\PricingRule::BOOKING_CLASS_USAGE_EXCLUDE_LISTED => 'Must not contain any of listed classes',
     ];
-    $passengerTypeOptions = array_merge(['ADT', 'CHD', 'INF'], $options['passenger_types'] ?? []);
     $carrierOptions = $options['carriers'] ?? [];
+    $carrierRuleOptions = [
+        \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION => 'Without restrictions',
+        \App\Models\PricingRule::AIRLINE_RULE_ONLY_LISTED => 'Only listed carriers',
+        \App\Models\PricingRule::AIRLINE_RULE_EXCLUDE_LISTED => 'Exclude listed carriers',
+    ];
+    $flightRestrictionOptions = [
+        \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE => 'Do not restrict',
+        \App\Models\PricingRule::FLIGHT_RESTRICTION_ONLY_LISTED => 'Only listed flights',
+        \App\Models\PricingRule::FLIGHT_RESTRICTION_EXCLUDE_LISTED => 'Exclude listed flights',
+    ];
 @endphp
 
 <x-app-layout>
@@ -46,13 +55,12 @@
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-3">
-                        <button
-                            type="button"
+                        <a
+                            href="{{ route('admin.pricing.rules.create') }}"
                             class="inline-flex items-center rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500"
-                            @click="openCreate()"
                         >
                             Add a rule
-                        </button>
+                        </a>
                     </div>
                 </div>
 
@@ -96,7 +104,16 @@
                                                 'id' => $rule->id,
                                                 'priority' => $rule->priority,
                                                 'carrier' => $rule->carrier ?? '',
-                                                'all_carriers' => empty($rule->carrier),
+                                                'plating_carrier' => $rule->plating_carrier ?? '',
+                                                'marketing_carriers_rule' => $rule->marketing_carriers_rule ?? \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION,
+                                                'marketing_carriers_rule_label' => $carrierRuleOptions[$rule->marketing_carriers_rule ?? \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION] ?? $carrierRuleOptions[\App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION],
+                                                'operating_carriers_rule' => $rule->operating_carriers_rule ?? \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION,
+                                                'operating_carriers_rule_label' => $carrierRuleOptions[$rule->operating_carriers_rule ?? \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION] ?? $carrierRuleOptions[\App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION],
+                                                'marketing_carriers' => $rule->marketing_carriers ?? [],
+                                                'operating_carriers' => $rule->operating_carriers ?? [],
+                                                'flight_restriction_type' => $rule->flight_restriction_type ?? \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE,
+                                                'flight_restriction_type_label' => $flightRestrictionOptions[$rule->flight_restriction_type ?? \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE] ?? $flightRestrictionOptions[\App\Models\PricingRule::FLIGHT_RESTRICTION_NONE],
+                                                'flight_numbers' => $rule->flight_numbers ?? '',
                                                 'usage' => $rule->usage,
                                                 'usage_label' => $usageLabel,
                                                 'origin' => $rule->origin,
@@ -123,6 +140,7 @@
                                                 'flat_amount' => $rule->flat_amount,
                                                 'fee_percent' => $rule->fee_percent,
                                                 'fixed_fee' => $rule->fixed_fee,
+                                                'is_primary_pcc' => (bool) $rule->is_primary_pcc,
                                                 'active' => (bool) $rule->active,
                                                 'notes' => $rule->notes,
                                             ];
@@ -152,17 +170,25 @@
                                             </td>
                                             <td class="px-3 py-2 text-gray-700">#{{ $rule->priority }}</td>
                                             <td class="px-3 py-2 text-gray-700">
-                                                <a href="{{ route('admin.pricing.index', array_merge(request()->except('page'), ['tab' => 'rules', 'carrier' => $rule->carrier ?? ''])) }}"
-                                                   class="text-indigo-600 hover:underline">
+                                            <a href="{{ route('admin.pricing.index', array_merge(request()->except('page'), ['tab' => 'rules', 'carrier' => $rule->carrier ?? ''])) }}"
+                                               class="text-indigo-600 hover:underline">
                                                     View rule #{{ $rule->id }}
                                                 </a>
                                             </td>
                                             <td class="px-3 py-2 text-gray-700">
-                                                <button type="button"
-                                                    class="text-sm font-semibold text-indigo-600 hover:underline"
-                                                    @click="openEdit(@js($ruleData))">
-                                                    Edit
-                                                </button>
+                                                <div class="flex gap-3">
+                                                    <button type="button"
+                                                        class="text-sm font-semibold text-indigo-600 hover:underline"
+                                                        @click="openEdit(@js($ruleData))">
+                                                        Edit
+                                                    </button>
+                                                    <form method="POST" action="{{ route('admin.pricing.rules.destroy', $rule) }}" onsubmit="return confirm('Delete this rule?');">
+                                                        @csrf
+                                                        @method('DELETE')
+                                                        <input type="hidden" name="return_url" value="{{ request()->fullUrl() }}">
+                                                        <button type="submit" class="text-sm font-semibold text-rose-600 hover:underline">Delete</button>
+                                                    </form>
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -180,12 +206,23 @@
 
             <x-modal name="pricing-rule-modal" :show="false">
                 <div class="p-6">
-                    <form method="POST" :action="$store.pricingRules.formAction()" class="space-y-4" x-ref="ruleForm">
+                    <form method="POST" :action="$store.pricingRules.formAction()" class="space-y-6" x-ref="ruleForm">
                         @csrf
                         <template x-if="$store.pricingRules.mode === 'edit'">
                             <input type="hidden" name="_method" value="PUT">
                         </template>
                         <input type="hidden" name="return_url" :value="$store.pricingRules.config.returnUrl">
+
+                        @if ($errors->any())
+                            <div class="rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
+                                <p class="font-semibold">Please fix the errors below.</p>
+                                <ul class="mt-2 space-y-1 list-disc list-inside">
+                                    @foreach ($errors->all() as $error)
+                                        <li>{{ $error }}</li>
+                                    @endforeach
+                                </ul>
+                            </div>
+                        @endif
 
                         <div class="flex items-center justify-between">
                             <div>
@@ -197,215 +234,21 @@
                             </button>
                         </div>
 
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <x-input-label for="rule_priority" value="Priority" />
-                                <input id="rule_priority" name="priority" type="number" min="0" max="1000" x-model="$store.pricingRules.form.priority"
-                                       class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            </div>
-                            <div>
-                                <x-input-label for="rule_carrier" value="Carrier (leave blank for all carriers)" />
-                                <div class="flex flex-wrap items-center gap-3">
-                                    <input id="rule_carrier" name="carrier" maxlength="3" x-model="$store.pricingRules.form.carrier"
-                                           :disabled="$store.pricingRules.form.all_carriers"
-                                           x-on:input="$store.pricingRules.form.carrier = $event.target.value.toUpperCase()"
-                                           placeholder="e.g. EK"
-                                           class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:bg-gray-100 disabled:text-gray-500" />
-                                    <label class="flex items-center gap-2 text-sm text-gray-700">
-                                        <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                                               x-model="$store.pricingRules.form.all_carriers"
-                                               @change="if ($event.target.checked) { $store.pricingRules.form.carrier = ''; }">
-                                        Apply to all carriers
-                                    </label>
-                                </div>
-                                <p class="mt-1 text-xs text-gray-500">Turn off “all carriers” to target a specific airline code.</p>
-                            </div>
-                        </div>
+                        @include('admin.pricing.partials.rule-form-fields')
 
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <x-input-label for="rule_usage" value="Usage" />
-                                <select id="rule_usage" name="usage" x-model="$store.pricingRules.form.usage"
-                                        class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    @foreach ($creationUsageOptions as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                                <p class="mt-1 text-xs text-gray-500">Only simple commission rules can be created from this screen.</p>
-                            </div>
-                            <div>
-                                <x-input-label for="rule_fare_type" value="Fare type" />
-                                <select id="rule_fare_type" name="fare_type" x-model="$store.pricingRules.form.fare_type"
-                                        class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <option value="">--- choose ---</option>
-                                    @foreach ($fareTypes as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <x-input-label for="rule_origin" value="Origin (optional)" />
-                                <input id="rule_origin" name="origin" maxlength="3" x-model="$store.pricingRules.form.origin"
-                                       class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            </div>
-                            <div>
-                                <x-input-label for="rule_destination" value="Destination (optional)" />
-                                <input id="rule_destination" name="destination" maxlength="3" x-model="$store.pricingRules.form.destination"
-                                       class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            </div>
-                        </div>
-
-                        <div class="flex flex-wrap items-center gap-4">
+                        <div class="mt-4 flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
                             <label class="flex items-center gap-2 text-sm text-gray-700">
-                                <input type="checkbox" name="both_ways" value="1" x-model="$store.pricingRules.form.both_ways"
+                                <input id="rule_active" type="checkbox" name="active" value="1" x-model="$store.pricingRules.form.active"
                                        class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                Both ways
+                                <span>Rule is active</span>
                             </label>
 
-                            <div>
-                                <x-input-label for="rule_travel_type" value="Travel type" />
-                                <select id="rule_travel_type" name="travel_type" x-model="$store.pricingRules.form.travel_type"
-                                        class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <option value="">--- choose ---</option>
-                                    @foreach ($travelTypes as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
+                            <div class="flex justify-end gap-3">
+                                <button type="button" class="text-sm text-gray-600 hover:text-gray-800" @click="$dispatch('close-modal', 'pricing-rule-modal')">
+                                    Cancel
+                                </button>
+                                <x-primary-button x-text="$store.pricingRules.mode === 'edit' ? 'Update rule' : 'Create rule'"></x-primary-button>
                             </div>
-
-                            <div>
-                                <x-input-label for="rule_cabin_class" value="Cabin" />
-                                <select id="rule_cabin_class" name="cabin_class" x-model="$store.pricingRules.form.cabin_class"
-                                        class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <option value="">--- choose ---</option>
-                                    @foreach ($cabinClasses as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <x-input-label for="rule_booking_class_rbd" value="Booking class (RBD)" />
-                                <input id="rule_booking_class_rbd" name="booking_class_rbd" maxlength="10" x-model="$store.pricingRules.form.booking_class_rbd"
-                                       class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            </div>
-                            <div>
-                                <x-input-label for="rule_booking_class_usage" value="Usage of booking classes" />
-                                <select id="rule_booking_class_usage" name="booking_class_usage" x-model="$store.pricingRules.form.booking_class_usage"
-                                        class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                    <option value="">--- choose ---</option>
-                                    @foreach ($bookingClassUsageOptions as $value => $label)
-                                        <option value="{{ $value }}">{{ $label }}</option>
-                                    @endforeach
-                                </select>
-                            </div>
-                        </div>
-
-                        <div>
-                            <x-input-label for="rule_passenger_types" value="Passenger types" />
-                            <select id="rule_passenger_types" name="passenger_types[]" multiple size="3"
-                                    x-model="$store.pricingRules.form.passenger_types"
-                                    class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                @foreach (array_unique($passengerTypeOptions) as $type)
-                                    <option value="{{ $type }}">{{ $type }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <x-input-label value="Sales window" />
-                                <div class="mt-1 grid grid-cols-2 gap-3">
-                                    <input type="datetime-local" name="sales_since" x-model="$store.pricingRules.form.sales_since"
-                                           class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                    <input type="datetime-local" name="sales_till" x-model="$store.pricingRules.form.sales_till"
-                                           class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                </div>
-                            </div>
-                            <div>
-                                <x-input-label value="Departures window" />
-                                <div class="mt-1 grid grid-cols-2 gap-3">
-                                    <input type="datetime-local" name="departures_since" x-model="$store.pricingRules.form.departures_since"
-                                           class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                    <input type="datetime-local" name="departures_till" x-model="$store.pricingRules.form.departures_till"
-                                           class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <x-input-label value="Returns window" />
-                                <div class="mt-1 grid grid-cols-2 gap-3">
-                                    <input type="datetime-local" name="returns_since" x-model="$store.pricingRules.form.returns_since"
-                                           class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                    <input type="datetime-local" name="returns_till" x-model="$store.pricingRules.form.returns_till"
-                                           class="rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                </div>
-                            </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <div>
-                                    <x-input-label for="rule_fare_type" value="Fare type" />
-                                    <select id="rule_fare_type" name="fare_type" x-model="$store.pricingRules.form.fare_type"
-                                            class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                                        @foreach ($fareTypes as $value => $label)
-                                            <option value="{{ $value }}">{{ $label }}</option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div>
-                                    <x-input-label for="rule_promo_code" value="Promo code" />
-                                    <input id="rule_promo_code" name="promo_code" maxlength="32" x-model="$store.pricingRules.form.promo_code"
-                                           class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="grid gap-4 md:grid-cols-2">
-                            <div>
-                                <x-input-label for="rule_percent" value="Percent" />
-                                <input id="rule_percent" name="percent" type="number" step="0.0001" min="0" max="100" x-model="$store.pricingRules.form.percent"
-                                       class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            </div>
-                            <div>
-                                <x-input-label for="rule_flat_amount" value="Flat amount" />
-                                <input id="rule_flat_amount" name="flat_amount" type="number" step="0.01" min="0" x-model="$store.pricingRules.form.flat_amount"
-                                       class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            </div>
-                            <div>
-                                <x-input-label for="rule_fee_percent" value="Fee percent" />
-                                <input id="rule_fee_percent" name="fee_percent" type="number" step="0.0001" min="0" max="100" x-model="$store.pricingRules.form.fee_percent"
-                                       class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            </div>
-                            <div>
-                                <x-input-label for="rule_fixed_fee" value="Fixed fee" />
-                                <input id="rule_fixed_fee" name="fixed_fee" type="number" step="0.01" min="0" x-model="$store.pricingRules.form.fixed_fee"
-                                       class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                            </div>
-                        </div>
-
-                        <div>
-                            <x-input-label for="rule_notes" value="Notes" />
-                            <textarea id="rule_notes" name="notes" rows="3" x-model="$store.pricingRules.form.notes"
-                                      class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500"></textarea>
-                        </div>
-
-                        <div class="flex items-center gap-2">
-                            <input id="rule_active" type="checkbox" name="active" value="1" x-model="$store.pricingRules.form.active"
-                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                            <label for="rule_active" class="text-sm text-gray-700">Rule is active</label>
-                        </div>
-
-                        <div class="flex justify-end gap-3">
-                            <button type="button" class="text-sm text-gray-600 hover:text-gray-800" @click="$dispatch('close-modal', 'pricing-rule-modal')">
-                                Cancel
-                            </button>
-                            <x-primary-button x-text="$store.pricingRules.mode === 'edit' ? 'Update rule' : 'Create rule'"></x-primary-button>
                         </div>
                     </form>
                 </div>
@@ -430,6 +273,24 @@
                                 <dd class="col-span-2 font-semibold" x-text="$store.pricingRules.detail.carrier || 'All carriers'"></dd>
                             </div>
                             <div class="grid grid-cols-3 gap-2">
+                                <dt class="text-gray-500">Plating carrier</dt>
+                                <dd class="col-span-2 font-semibold" x-text="$store.pricingRules.detail.plating_carrier || '—'"></dd>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <dt class="text-gray-500">Marketing carriers</dt>
+                                <dd class="col-span-2">
+                                    <div class="font-semibold" x-text="$store.pricingRules.detail.marketing_carriers_rule_label || 'Without restrictions'"></div>
+                                    <div class="text-xs text-gray-500" x-show="$store.pricingRules.detail.marketing_carriers_list" x-text="$store.pricingRules.detail.marketing_carriers_list"></div>
+                                </dd>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <dt class="text-gray-500">Operating carriers</dt>
+                                <dd class="col-span-2">
+                                    <div class="font-semibold" x-text="$store.pricingRules.detail.operating_carriers_rule_label || 'Without restrictions'"></div>
+                                    <div class="text-xs text-gray-500" x-show="$store.pricingRules.detail.operating_carriers_list" x-text="$store.pricingRules.detail.operating_carriers_list"></div>
+                                </dd>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
                                 <dt class="text-gray-500">Usage</dt>
                                 <dd class="col-span-2 font-semibold" x-text="$store.pricingRules.detail.usage_label || $store.pricingRules.detail.usage || '—'"></dd>
                             </div>
@@ -440,6 +301,15 @@
                                     →
                                     <span x-text="$store.pricingRules.detail.destination || 'Any'"></span>
                                     <span class="ml-2 rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600" x-text="$store.pricingRules.detail.both_ways ? 'Both ways' : 'One direction'"></span>
+                                </dd>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <dt class="text-gray-500">Flight restriction</dt>
+                                <dd class="col-span-2">
+                                    <div class="flex flex-col">
+                                        <span class="font-semibold" x-text="$store.pricingRules.detail.flight_restriction_type_label || 'Do not restrict'"></span>
+                                        <span class="text-xs text-gray-500" x-text="$store.pricingRules.detail.flight_numbers || '—'"></span>
+                                    </div>
                                 </dd>
                             </div>
                             <div class="grid grid-cols-3 gap-2">
@@ -488,6 +358,10 @@
                                 <dd class="col-span-2" x-text="$store.pricingRules.detail.promo_code || '—'"></dd>
                             </div>
                             <div class="grid grid-cols-3 gap-2">
+                                <dt class="text-gray-500">Multi PCC</dt>
+                                <dd class="col-span-2 font-semibold" x-text="$store.pricingRules.detail.is_primary_pcc ? 'Primary' : 'Not primary'"></dd>
+                            </div>
+                            <div class="grid grid-cols-3 gap-2">
                                 <dt class="text-gray-500">Status</dt>
                                 <dd class="col-span-2">
                                     <span class="rounded px-2 py-1 text-xs font-semibold" :class="$store.pricingRules.detail.active ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'"
@@ -498,6 +372,17 @@
                                 <dt class="text-gray-500">Notes</dt>
                                 <dd class="col-span-2 whitespace-pre-line" x-text="$store.pricingRules.detail.notes || '—'"></dd>
                             </div>
+                            <div class="grid grid-cols-3 gap-2">
+                                <dt class="text-gray-500">Actions</dt>
+                                <dd class="col-span-2">
+                                    <form method="POST" :action="`${$store.pricingRules.config.updateBaseUrl}/${$store.pricingRules.detail.id}`" onsubmit="return confirm('Delete this rule?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <input type="hidden" name="return_url" :value="$store.pricingRules.config.returnUrl">
+                                        <button type="submit" class="text-sm font-semibold text-rose-600 hover:underline">Delete rule</button>
+                                    </form>
+                                </dd>
+                            </div>
                         </dl>
                     </div>
                 </div>
@@ -505,107 +390,5 @@
         </div>
     </div>
 
-    @push('scripts')
-        <script>
-            document.addEventListener('alpine:init', () => {
-                Alpine.data('pricingRulesPage', (config) => ({
-                    init() {
-                        const defaults = () => ({
-                            id: null,
-                            priority: 0,
-                            carrier: '',
-                            all_carriers: true,
-                            usage: '{{ \App\Models\PricingRule::USAGE_COMMISSION_BASE }}',
-                            origin: '',
-                            destination: '',
-                            both_ways: false,
-                            travel_type: 'OW+RT',
-                            cabin_class: '',
-                            booking_class_rbd: '',
-                            booking_class_usage: '{{ \App\Models\PricingRule::BOOKING_CLASS_USAGE_AT_LEAST_ONE }}',
-                            passenger_types: [],
-                            sales_since: '',
-                            sales_till: '',
-                            departures_since: '',
-                            departures_till: '',
-                            returns_since: '',
-                            returns_till: '',
-                            fare_type: 'public_and_private',
-                            promo_code: '',
-                            percent: '',
-                            flat_amount: '',
-                            fee_percent: '',
-                            fixed_fee: '',
-                            active: true,
-                            notes: '',
-                        });
-
-                        Alpine.store('pricingRules', {
-                            mode: 'create',
-                            form: defaults(),
-                            detail: defaults(),
-                            config,
-                            defaults,
-                            resetForm() {
-                                this.form = defaults();
-                            },
-                            openCreate() {
-                                this.mode = 'create';
-                                this.resetForm();
-                                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
-                            },
-                            openEdit(rule = {}) {
-                                this.mode = 'edit';
-                                this.form = Object.assign(defaults(), rule);
-                                this.form.all_carriers = !this.form.carrier;
-                                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
-                            },
-                            openCopy(rule = {}) {
-                                this.mode = 'create';
-                                const data = Object.assign(defaults(), rule);
-                                data.id = null;
-                                data.all_carriers = !data.carrier;
-                                this.form = data;
-                                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
-                            },
-                            openDetail(rule = {}) {
-                                this.detail = Object.assign(defaults(), rule);
-                                this.detail.all_carriers = !this.detail.carrier;
-                                window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-detail' }));
-                            },
-                            formAction() {
-                                if (this.mode === 'edit' && this.form.id) {
-                                    return `${this.config.updateBaseUrl}/${this.form.id}`;
-                                }
-
-                                return this.config.createUrl;
-                            },
-                            modeTitle() {
-                                if (this.mode === 'edit' && this.form.id) {
-                                    return `Edit rule #${this.form.id}`;
-                                }
-
-                                return 'Create pricing rule';
-                            },
-                        });
-                    },
-                    store() {
-                        return Alpine.store('pricingRules');
-                    },
-                    openCreate() {
-                        this.store().openCreate();
-                    },
-                    openEdit(rule) {
-                        this.store().openEdit(rule);
-                    },
-                    openCopy(rule) {
-                        this.store().openCopy(rule);
-                    },
-                    openDetail(rule) {
-                        this.store().openDetail(rule);
-                    },
-                }));
-            });
-        </script>
-    @endpush
+    @include('admin.pricing.partials.pricing-rule-scripts')
 </x-app-layout>

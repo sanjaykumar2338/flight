@@ -60,6 +60,7 @@ Route::middleware('auth')->group(function () {
 Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     Route::get('/', AdminDashboardController::class)->name('dashboard');
     Route::get('pricing', [PricingRuleController::class, 'index'])->name('pricing.index');
+    Route::get('pricing/rules/create', [PricingRuleController::class, 'create'])->name('pricing.rules.create');
     Route::post('pricing/rules', [PricingRuleController::class, 'store'])->name('pricing.rules.store');
     Route::put('pricing/rules/{pricingRule}', [PricingRuleController::class, 'update'])->name('pricing.rules.update');
     Route::delete('pricing/rules/{pricingRule}', [PricingRuleController::class, 'destroy'])->name('pricing.rules.destroy');

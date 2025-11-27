@@ -28,6 +28,13 @@ class PricingEngine
     public function applyPricing(array $itinerary, array $paxBreakdown, Money $base, Money $total, array $ctx): PricingResult
     {
         $carrier = $this->normalizeCode(Arr::get($ctx, 'carrier'));
+        $platingCarrier = $this->normalizeCode(Arr::get($ctx, 'plating_carrier'));
+        $marketingCarriers = $this->normalizeCodes(Arr::get($ctx, 'marketing_carriers'));
+        $operatingCarriers = $this->normalizeCodes(Arr::get($ctx, 'operating_carriers'));
+        $flightNumbers = $this->normalizeCodes(Arr::get($ctx, 'flight_numbers'));
+        $flightNumbers = empty($flightNumbers)
+            ? $this->extractFlightNumbersFromItinerary($itinerary)
+            : $flightNumbers;
         $currency = $total->currency();
 
         $rules = $this->activeRulesForCarrier($carrier);
@@ -54,7 +61,11 @@ class PricingEngine
             $passengerTypes,
             $salesDate,
             $departureDate,
-            $returnDate
+            $returnDate,
+            $platingCarrier,
+            $marketingCarriers,
+            $operatingCarriers,
+            $flightNumbers
         ) {
             return $this->ruleMatches(
                 $rule,
@@ -68,7 +79,11 @@ class PricingEngine
                 $passengerTypes,
                 $salesDate,
                 $departureDate,
-                $returnDate
+                $returnDate,
+                $platingCarrier,
+                $marketingCarriers,
+                $operatingCarriers,
+                $flightNumbers
             );
         });
 
@@ -192,8 +207,24 @@ class PricingEngine
         array $passengerTypes,
         Carbon $salesDate,
         ?Carbon $departureDate,
-        ?Carbon $returnDate
+        ?Carbon $returnDate,
+        ?string $platingCarrier,
+        array $marketingCarriers,
+        array $operatingCarriers,
+        array $flightNumbers
     ): bool {
+        if (!$this->matchesPlatingCarrier($rule, $platingCarrier)) {
+            return false;
+        }
+
+        if (!$this->matchesCarrierRule($rule->marketing_carriers_rule, $rule->marketing_carriers ?? [], $marketingCarriers)) {
+            return false;
+        }
+
+        if (!$this->matchesCarrierRule($rule->operating_carriers_rule, $rule->operating_carriers ?? [], $operatingCarriers)) {
+            return false;
+        }
+
         if (!$this->matchesAirports($rule, $origin, $destination)) {
             return false;
         }
@@ -234,6 +265,10 @@ class PricingEngine
             return false;
         }
 
+        if (!$this->matchesFlightRestriction($rule, $flightNumbers)) {
+            return false;
+        }
+
         return true;
     }
 
@@ -259,6 +294,76 @@ class PricingEngine
 
         return (!$ruleOrigin || $ruleOrigin === $destination)
             && (!$ruleDestination || $ruleDestination === $origin);
+    }
+
+    private function matchesPlatingCarrier(PricingRule $rule, ?string $platingCarrier): bool
+    {
+        if (!$rule->plating_carrier) {
+            return true;
+        }
+
+        return $this->normalizeCode($rule->plating_carrier) === $this->normalizeCode($platingCarrier);
+    }
+
+    /**
+        * @param array<int, string> $ruleList
+        * @param array<int, string> $contextList
+        */
+    private function matchesCarrierRule(?string $ruleType, array $ruleList, array $contextList): bool
+    {
+        $ruleType = $ruleType ?: PricingRule::AIRLINE_RULE_NO_RESTRICTION;
+        $ruleCodes = $this->normalizeCodes($ruleList);
+        $contextCodes = $this->normalizeCodes($contextList);
+
+        if ($ruleType === PricingRule::AIRLINE_RULE_NO_RESTRICTION) {
+            return true;
+        }
+
+        if (empty($contextCodes)) {
+            // If we require a restriction but have no context, treat as not matched.
+            return false;
+        }
+
+        $intersection = array_intersect($ruleCodes, $contextCodes);
+
+        return match ($ruleType) {
+            PricingRule::AIRLINE_RULE_ONLY_LISTED => !empty($intersection),
+            PricingRule::AIRLINE_RULE_EXCLUDE_LISTED => empty($intersection),
+            default => true,
+        };
+    }
+
+    /**
+     * @param array<int, string> $flightNumbers
+     */
+    private function matchesFlightRestriction(PricingRule $rule, array $flightNumbers): bool
+    {
+        $restriction = $rule->flight_restriction_type ?: PricingRule::FLIGHT_RESTRICTION_NONE;
+        $ruleNumbers = $this->normalizeCodes(
+            $rule->flight_numbers ? explode(',', (string) $rule->flight_numbers) : []
+        );
+
+        if ($restriction === PricingRule::FLIGHT_RESTRICTION_NONE) {
+            return true;
+        }
+
+        if (empty($ruleNumbers)) {
+            // If a restriction is requested but no numbers are provided, fail safe.
+            return false;
+        }
+
+        $contextNumbers = $this->normalizeCodes($flightNumbers);
+        if (empty($contextNumbers)) {
+            return false;
+        }
+
+        $intersection = array_intersect($ruleNumbers, $contextNumbers);
+
+        return match ($restriction) {
+            PricingRule::FLIGHT_RESTRICTION_ONLY_LISTED => !empty($intersection),
+            PricingRule::FLIGHT_RESTRICTION_EXCLUDE_LISTED => empty($intersection),
+            default => true,
+        };
     }
 
     private function matchesTravelType(PricingRule $rule, ?string $travelType): bool
@@ -691,6 +796,49 @@ class PricingEngine
         $normalized = strtoupper(trim((string) $value));
 
         return $normalized === '' ? null : $normalized;
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<int, string>
+     */
+    private function normalizeCodes($value): array
+    {
+        if ($value === null) {
+            return [];
+        }
+
+        if (is_string($value)) {
+            $value = explode(',', $value);
+        }
+
+        if (!is_array($value)) {
+            return [];
+        }
+
+        return collect($value)
+            ->map(fn ($item) => $this->normalizeCode($item))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int, mixed> $itinerary
+     * @return array<int, string>
+     */
+    private function extractFlightNumbersFromItinerary(array $itinerary): array
+    {
+        return collect($itinerary)
+            ->map(function ($segment) {
+                $number = Arr::get($segment, 'flight_number') ?? Arr::get($segment, 'number');
+                return $this->normalizeCode($number);
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function parseBookingClasses(?string $value): array

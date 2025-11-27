@@ -42,35 +42,7 @@ class PricingRuleController extends Controller
             ->filter()
             ->values();
 
-        $existingCarriers = PricingRule::query()
-            ->whereNotNull('carrier')
-            ->distinct()
-            ->pluck('carrier');
-
-        $options = [
-            'carriers' => $seededCarriers->merge($existingCarriers)->filter()->unique()->sort()->values()->all(),
-            'passenger_types' => PricingRule::query()
-                ->whereNotNull('passenger_types')
-                ->pluck('passenger_types')
-                ->flatten()
-                ->unique()
-                ->sort()
-                ->values()
-                ->all(),
-            // Keep usage creation simple: only commission rules can be created from the UI.
-            'usage_options' => [
-                'commission_base' => 'Commission from base price',
-                'commission_discount_base' => 'Commission with discount from base price',
-                'discount_base' => 'Discount from base price',
-                'discount_total_promo' => 'Discount from total price & promo code',
-            ],
-            'creation_usage_options' => [
-                'commission_base' => 'Commission from base price',
-            ],
-            'travel_types' => DB::table('pricing_dropdown_options')->where('type', 'travel_types')->orderBy('sort_order')->pluck('label', 'value')->toArray(),
-            'fare_types' => DB::table('pricing_dropdown_options')->where('type', 'fare_types')->orderBy('sort_order')->pluck('label', 'value')->toArray(),
-            'cabin_classes' => DB::table('pricing_dropdown_options')->where('type', 'cabin_classes')->orderBy('sort_order')->pluck('label', 'value')->toArray(),
-        ];
+        $options = $this->pricingOptions($seededCarriers);
 
         $commissionOverview = PricingRule::query()
             ->active()
@@ -93,6 +65,21 @@ class PricingRuleController extends Controller
             'featureEnabled' => config('pricing.rules.enabled'),
             'tab' => $request->input('tab', 'rules'),
             'commissionOverview' => $commissionOverview,
+        ]);
+    }
+
+    public function create(Request $request): View
+    {
+        $seededCarriers = DB::table('pricing_dropdown_options')
+            ->where('type', 'carriers')
+            ->orderBy('sort_order')
+            ->pluck('value')
+            ->filter()
+            ->values();
+
+        return view('admin.pricing.create', [
+            'options' => $this->pricingOptions($seededCarriers),
+            'returnUrl' => $request->input('return_url') ?: route('admin.pricing.index'),
         ]);
     }
 
@@ -298,5 +285,44 @@ class PricingRuleController extends Controller
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /**
+     * @param \Illuminate\Support\Collection<int, string> $seededCarriers
+     * @return array<string, mixed>
+     */
+    private function pricingOptions($seededCarriers): array
+    {
+        $existingCarriers = PricingRule::query()
+            ->whereNotNull('carrier')
+            ->distinct()
+            ->pluck('carrier');
+
+        return [
+            'carriers' => $seededCarriers->merge($existingCarriers)->filter()->unique()->sort()->values()->all(),
+            'passenger_types' => PricingRule::query()
+                ->whereNotNull('passenger_types')
+                ->pluck('passenger_types')
+                ->flatten()
+                ->unique()
+                ->sort()
+                ->values()
+                ->all(),
+            'usage_options' => [
+                'commission_base' => 'Commission from base price',
+                'commission_discount_base' => 'Commission with discount from base price',
+                'discount_base' => 'Discount from base price',
+                'discount_total_promo' => 'Discount from total price & promo code',
+            ],
+            'creation_usage_options' => [
+                'commission_base' => 'Commission from base price',
+                'discount_base' => 'Discount from base price',
+                'discount_total_promo' => 'Discount from total price & promo code',
+                'commission_discount_base' => 'Commission with discount from base price',
+            ],
+            'travel_types' => DB::table('pricing_dropdown_options')->where('type', 'travel_types')->orderBy('sort_order')->pluck('label', 'value')->toArray(),
+            'fare_types' => DB::table('pricing_dropdown_options')->where('type', 'fare_types')->orderBy('sort_order')->pluck('label', 'value')->toArray(),
+            'cabin_classes' => DB::table('pricing_dropdown_options')->where('type', 'cabin_classes')->orderBy('sort_order')->pluck('label', 'value')->toArray(),
+        ];
     }
 }

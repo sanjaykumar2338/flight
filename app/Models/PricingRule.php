@@ -26,6 +26,14 @@ class PricingRule extends Model
     public const BOOKING_CLASS_USAGE_ONLY_LISTED = 'only_listed';
     public const BOOKING_CLASS_USAGE_EXCLUDE_LISTED = 'exclude_listed';
 
+    public const AIRLINE_RULE_NO_RESTRICTION = 'no_restriction';
+    public const AIRLINE_RULE_ONLY_LISTED = 'only';
+    public const AIRLINE_RULE_EXCLUDE_LISTED = 'exclude';
+
+    public const FLIGHT_RESTRICTION_NONE = 'no_restriction';
+    public const FLIGHT_RESTRICTION_ONLY_LISTED = 'only_listed';
+    public const FLIGHT_RESTRICTION_EXCLUDE_LISTED = 'exclude_listed';
+
     public const CACHE_KEY_PREFIX = 'pricing:rules:carrier:';
     public const CACHE_KEY_GENERIC = '__ALL__';
 
@@ -35,6 +43,13 @@ class PricingRule extends Model
     protected $fillable = [
         'priority',
         'carrier',
+        'plating_carrier',
+        'marketing_carriers_rule',
+        'marketing_carriers',
+        'operating_carriers_rule',
+        'operating_carriers',
+        'flight_restriction_type',
+        'flight_numbers',
         'usage',
         'origin',
         'destination',
@@ -58,6 +73,7 @@ class PricingRule extends Model
         'flat_amount',
         'fee_percent',
         'fixed_fee',
+        'is_primary_pcc',
         'active',
         'notes',
     ];
@@ -70,7 +86,10 @@ class PricingRule extends Model
         'fee_percent' => 'decimal:4',
         'fixed_fee' => 'decimal:2',
         'active' => 'boolean',
+        'is_primary_pcc' => 'boolean',
         'passenger_types' => 'array',
+        'marketing_carriers' => 'array',
+        'operating_carriers' => 'array',
         'sales_since' => 'datetime',
         'sales_till' => 'datetime',
         'departures_since' => 'datetime',
@@ -78,6 +97,24 @@ class PricingRule extends Model
         'returns_since' => 'datetime',
         'returns_till' => 'datetime',
     ];
+
+    public static function carrierRuleOptions(): array
+    {
+        return [
+            self::AIRLINE_RULE_NO_RESTRICTION,
+            self::AIRLINE_RULE_ONLY_LISTED,
+            self::AIRLINE_RULE_EXCLUDE_LISTED,
+        ];
+    }
+
+    public static function flightRestrictionOptions(): array
+    {
+        return [
+            self::FLIGHT_RESTRICTION_NONE,
+            self::FLIGHT_RESTRICTION_ONLY_LISTED,
+            self::FLIGHT_RESTRICTION_EXCLUDE_LISTED,
+        ];
+    }
 
     public static function usageOptions(): array
     {
