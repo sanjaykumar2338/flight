@@ -9,9 +9,10 @@
         \App\Models\PricingRule::BOOKING_CLASS_USAGE_EXCLUDE_LISTED => 'Must not contain any of listed classes',
     ];
     $carrierRuleOptions = [
-        \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION => 'Without restrictions',
-        \App\Models\PricingRule::AIRLINE_RULE_ONLY_LISTED => 'Only listed carriers',
-        \App\Models\PricingRule::AIRLINE_RULE_EXCLUDE_LISTED => 'Exclude listed carriers',
+        '' => 'Without restrictions',
+        'Y' => 'Different marketing carriers',
+        'N' => 'Plating carrier only',
+        'D' => 'Only other than plating carrier',
     ];
     $flightRestrictionOptions = [
         \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE => 'Do not restrict',

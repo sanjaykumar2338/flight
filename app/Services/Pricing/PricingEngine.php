@@ -217,11 +217,23 @@ class PricingEngine
             return false;
         }
 
-        if (!$this->matchesCarrierRule($rule->marketing_carriers_rule, $rule->marketing_carriers ?? [], $marketingCarriers)) {
+        if (!$this->matchesCarrierRule(
+            $rule->marketing_carriers_rule,
+            $rule->marketing_carriers ?? [],
+            $marketingCarriers,
+            $operatingCarriers,
+            $platingCarrier
+        )) {
             return false;
         }
 
-        if (!$this->matchesCarrierRule($rule->operating_carriers_rule, $rule->operating_carriers ?? [], $operatingCarriers)) {
+        if (!$this->matchesCarrierRule(
+            $rule->operating_carriers_rule,
+            $rule->operating_carriers ?? [],
+            $operatingCarriers,
+            $marketingCarriers,
+            $platingCarrier
+        )) {
             return false;
         }
 
@@ -306,14 +318,21 @@ class PricingEngine
     }
 
     /**
-        * @param array<int, string> $ruleList
-        * @param array<int, string> $contextList
-        */
-    private function matchesCarrierRule(?string $ruleType, array $ruleList, array $contextList): bool
-    {
-        $ruleType = $ruleType ?: PricingRule::AIRLINE_RULE_NO_RESTRICTION;
+     * @param array<int, string> $ruleList
+     * @param array<int, string> $contextList
+     * @param array<int, string> $otherCarriers
+     */
+    private function matchesCarrierRule(
+        ?string $ruleType,
+        array $ruleList,
+        array $contextList,
+        array $otherCarriers = [],
+        ?string $platingCarrier = null
+    ): bool {
+        $ruleType = PricingRule::normalizeCarrierRule($ruleType) ?? PricingRule::AIRLINE_RULE_NO_RESTRICTION;
         $ruleCodes = $this->normalizeCodes($ruleList);
         $contextCodes = $this->normalizeCodes($contextList);
+        $plating = $this->normalizeCode($platingCarrier);
 
         if ($ruleType === PricingRule::AIRLINE_RULE_NO_RESTRICTION) {
             return true;
@@ -329,6 +348,9 @@ class PricingEngine
         return match ($ruleType) {
             PricingRule::AIRLINE_RULE_ONLY_LISTED => !empty($intersection),
             PricingRule::AIRLINE_RULE_EXCLUDE_LISTED => empty($intersection),
+            PricingRule::AIRLINE_RULE_DIFFERENT_MARKETING => count($contextCodes) > 1,
+            PricingRule::AIRLINE_RULE_PLATING_ONLY => $plating !== null && !empty($contextCodes) && count(array_unique(array_merge($contextCodes, [$plating]))) === 1,
+            PricingRule::AIRLINE_RULE_OTHER_THAN_PLATING => $plating !== null && !empty($contextCodes) && !in_array($plating, $contextCodes, true),
             default => true,
         };
     }

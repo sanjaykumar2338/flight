@@ -30,6 +30,7 @@ class FlightSearchRequest extends FormRequest
             'cabin_class' => ['required', 'string', 'in:ECONOMY,BUSINESS,PREMIUM_ECONOMY,FIRST'],
             'airlines' => ['sometimes', 'array'],
             'airlines.*' => ['string', 'size:2'],
+            'interline' => ['nullable', 'string', 'in:Y,N,D'],
         ];
     }
 
@@ -82,6 +83,7 @@ class FlightSearchRequest extends FormRequest
             'children' => $this->input('children', 0),
             'infants' => $this->input('infants', 0),
             'cabin_class' => strtoupper($this->input('cabin_class', 'ECONOMY')),
+            'interline' => $this->normalizeInterline($this->input('interline')),
         ]);
     }
 
@@ -98,5 +100,12 @@ class FlightSearchRequest extends FormRequest
     public function airlineFilters(): array
     {
         return $this->input('airlines', []);
+    }
+
+    private function normalizeInterline(mixed $value): ?string
+    {
+        $normalized = strtoupper(trim((string) $value));
+
+        return in_array($normalized, ['Y', 'N', 'D'], true) ? $normalized : null;
     }
 }

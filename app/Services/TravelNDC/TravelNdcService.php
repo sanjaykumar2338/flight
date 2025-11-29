@@ -1383,6 +1383,7 @@ class TravelNdcService
                 'arrival' => $this->combineDateTime($arrivalDate, $arrivalTime),
                 'marketing_carrier' => $this->firstText($xpath, $segment, ['ns:MarketingCarrier/ns:AirlineID']),
                 'marketing_flight_number' => $this->firstText($xpath, $segment, ['ns:MarketingCarrier/ns:FlightNumber']),
+                'flight_number' => $this->firstText($xpath, $segment, ['ns:MarketingCarrier/ns:FlightNumber']),
                 'operating_carrier' => $this->firstText($xpath, $segment, ['ns:OperatingCarrier/ns:AirlineID']),
                 'equipment' => $this->firstText($xpath, $segment, ['ns:Equipment']),
                 'duration' => $this->firstText($xpath, $segment, ['ns:FlightDuration']),

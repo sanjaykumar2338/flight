@@ -95,17 +95,9 @@ class PricingRuleRequest extends FormRequest
             'priority' => $this->normalizeInteger($this->input('priority', 0)),
             'carrier' => $this->normalizeCarrier($this->input('carrier')),
             'plating_carrier' => $this->normalizeCarrier($this->input('plating_carrier')),
-            'marketing_carriers_rule' => $this->normalizeEnum(
-                $this->input('marketing_carriers_rule'),
-                PricingRule::carrierRuleOptions(),
-                PricingRule::AIRLINE_RULE_NO_RESTRICTION
-            ),
+            'marketing_carriers_rule' => PricingRule::normalizeCarrierRule($this->input('marketing_carriers_rule')) ?? PricingRule::AIRLINE_RULE_NO_RESTRICTION,
             'marketing_carriers' => $this->normalizeCarriersList($this->input('marketing_carriers')),
-            'operating_carriers_rule' => $this->normalizeEnum(
-                $this->input('operating_carriers_rule'),
-                PricingRule::carrierRuleOptions(),
-                PricingRule::AIRLINE_RULE_NO_RESTRICTION
-            ),
+            'operating_carriers_rule' => PricingRule::normalizeCarrierRule($this->input('operating_carriers_rule')) ?? PricingRule::AIRLINE_RULE_NO_RESTRICTION,
             'operating_carriers' => $this->normalizeCarriersList($this->input('operating_carriers')),
             'flight_restriction_type' => $this->normalizeEnum(
                 $this->input('flight_restriction_type'),

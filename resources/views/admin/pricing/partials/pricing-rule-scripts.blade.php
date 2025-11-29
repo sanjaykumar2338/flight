@@ -6,9 +6,9 @@
                 priority: 0,
                 carrier: '',
                 plating_carrier: '',
-                marketing_carriers_rule: '{{ \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION }}',
+                marketing_carriers_rule: '',
                 marketing_carriers_rule_label: '',
-                operating_carriers_rule: '{{ \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION }}',
+                operating_carriers_rule: '',
                 operating_carriers_rule_label: '',
                 marketing_carriers: '',
                 operating_carriers: '',
@@ -44,7 +44,28 @@
                 notes: '',
             });
 
-            const normalizeCarrierRule = (value) => value || '{{ \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION }}';
+            const normalizeCarrierRule = (value) => {
+                const upper = (value || '').toString().toUpperCase();
+                if (upper === 'Y' || upper === 'N' || upper === 'D' || upper === '') {
+                    return upper;
+                }
+
+                switch (upper) {
+                    case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_DIFFERENT_MARKETING) }}':
+                        return 'Y';
+                    case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_PLATING_ONLY) }}':
+                        return 'N';
+                    case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_OTHER_THAN_PLATING) }}':
+                        return 'D';
+                    case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_ONLY_LISTED) }}':
+                        return 'Y';
+                    case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_EXCLUDE_LISTED) }}':
+                        return 'D';
+                    case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION) }}':
+                    default:
+                        return '';
+                }
+            };
             const normalizeFlightRestriction = (value) => value || '{{ \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE }}';
 
             const initStore = (config = {}) => {

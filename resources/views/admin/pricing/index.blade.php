@@ -11,10 +11,19 @@
     ];
     $carrierOptions = $options['carriers'] ?? [];
     $carrierRuleOptions = [
-        \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION => 'Without restrictions',
-        \App\Models\PricingRule::AIRLINE_RULE_ONLY_LISTED => 'Only listed carriers',
-        \App\Models\PricingRule::AIRLINE_RULE_EXCLUDE_LISTED => 'Exclude listed carriers',
+        '' => 'Without restrictions',
+        'Y' => 'Different marketing carriers',
+        'N' => 'Plating carrier only',
+        'D' => 'Only other than plating carrier',
     ];
+    $carrierRuleDisplayOptions = array_merge($carrierRuleOptions, [
+        \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION => 'Without restrictions',
+        \App\Models\PricingRule::AIRLINE_RULE_DIFFERENT_MARKETING => 'Different marketing carriers',
+        \App\Models\PricingRule::AIRLINE_RULE_PLATING_ONLY => 'Plating carrier only',
+        \App\Models\PricingRule::AIRLINE_RULE_OTHER_THAN_PLATING => 'Only other than plating carrier',
+        \App\Models\PricingRule::AIRLINE_RULE_ONLY_LISTED => 'Only listed are authorized',
+        \App\Models\PricingRule::AIRLINE_RULE_EXCLUDE_LISTED => 'Exclude listed carriers',
+    ]);
     $flightRestrictionOptions = [
         \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE => 'Do not restrict',
         \App\Models\PricingRule::FLIGHT_RESTRICTION_ONLY_LISTED => 'Only listed flights',
@@ -106,9 +115,9 @@
                                                 'carrier' => $rule->carrier ?? '',
                                                 'plating_carrier' => $rule->plating_carrier ?? '',
                                                 'marketing_carriers_rule' => $rule->marketing_carriers_rule ?? \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION,
-                                                'marketing_carriers_rule_label' => $carrierRuleOptions[$rule->marketing_carriers_rule ?? \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION] ?? $carrierRuleOptions[\App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION],
+                                                'marketing_carriers_rule_label' => $carrierRuleDisplayOptions[$rule->marketing_carriers_rule ?? \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION] ?? $carrierRuleDisplayOptions[\App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION],
                                                 'operating_carriers_rule' => $rule->operating_carriers_rule ?? \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION,
-                                                'operating_carriers_rule_label' => $carrierRuleOptions[$rule->operating_carriers_rule ?? \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION] ?? $carrierRuleOptions[\App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION],
+                                                'operating_carriers_rule_label' => $carrierRuleDisplayOptions[$rule->operating_carriers_rule ?? \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION] ?? $carrierRuleDisplayOptions[\App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION],
                                                 'marketing_carriers' => $rule->marketing_carriers ?? [],
                                                 'operating_carriers' => $rule->operating_carriers ?? [],
                                                 'flight_restriction_type' => $rule->flight_restriction_type ?? \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE,

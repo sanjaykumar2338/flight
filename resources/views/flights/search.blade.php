@@ -1,6 +1,10 @@
 @php
     $search = $searchParams ?? [];
     $selectedAirlines = $selectedAirlines ?? [];
+    $interlineValue = strtoupper((string) old('interline', $search['interline'] ?? ''));
+    if (!in_array($interlineValue, ['Y', 'N', 'D'], true)) {
+        $interlineValue = '';
+    }
     $airlineLookup = collect($airlineLookup ?? config('airlines', []))
         ->mapWithKeys(fn ($name, $code) => [strtoupper($code) => (string) $name])
         ->all();
@@ -355,46 +359,63 @@
             <div class="grid gap-6 lg:grid-cols-[30%_40%]">
             <aside class="lg:sticky lg:top-6" style="width: 116%;">
                 <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3" data-airline-filter-wrapper>
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                                <span>Airlines</span>
-                                <span class="text-xs text-slate-500" data-airline-selection-count>{{ empty($preselectedAirlines) ? 'All' : count($preselectedAirlines) . ' selected' }}</span>
-                            </div>
-                            <button type="button" data-clear-airline-filters class="text-xs font-semibold text-sky-700 hover:text-sky-800">
-                                Clear
-                            </button>
-                        </div>
-                        <div class="mt-2">
-                            <input
-                                type="text"
-                                class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
-                                placeholder="Search airlines..."
-                                data-airline-search
+                    <div class="space-y-4">
+                        <div class="rounded-xl border border-slate-100 bg-slate-50/80 p-3">
+                            <label for="interline" class="block text-sm font-semibold text-slate-800">Interline</label>
+                            <select
+                                name="interline"
+                                id="interline"
+                                form="flight-search-form"
+                                class="mt-2 block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
                             >
+                                <option value="" @selected($interlineValue === '')>Without restrictions</option>
+                                <option value="Y" @selected($interlineValue === 'Y')>Different marketing carriers</option>
+                                <option value="N" @selected($interlineValue === 'N')>Plating carrier only</option>
+                                <option value="D" @selected($interlineValue === 'D')>Only other than plating carrier</option>
+                            </select>
                         </div>
-                        <div class="space-y-2 max-h-60 overflow-y-auto pr-1" data-airline-list>
-                            @forelse ($filterAirlines as $airline)
-                                <label class="flex items-center gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:border-sky-200 hover:bg-slate-50">
-                                    <input
-                                        type="checkbox"
-                                        name="selected_airlines[]"
-                                        value="{{ $airline['code'] }}"
-                                        form="flight-search-form"
-                                        class="h-4 w-4 rounded text-sky-600 focus:ring-sky-500"
-                                        data-airline-filter
-                                        @checked(in_array($airline['code'], $preselectedAirlines, true))
-                                    >
-                                    <span class="flex-1">
-                                        <span class="font-semibold text-slate-900">{{ $airline['code'] }}</span>
-                                        @if ($airline['label'] !== $airline['code'])
-                                            <span class="ml-1 text-slate-500">– {{ $airline['label'] }}</span>
-                                        @endif
-                                    </span>
-                                </label>
-                            @empty
-                                <p class="text-sm text-slate-500">No airlines available for this search.</p>
-                            @endforelse
+
+                        <div class="space-y-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3" data-airline-filter-wrapper>
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                                    <span>Airlines</span>
+                                    <span class="text-xs text-slate-500" data-airline-selection-count>{{ empty($preselectedAirlines) ? 'All' : count($preselectedAirlines) . ' selected' }}</span>
+                                </div>
+                                <button type="button" data-clear-airline-filters class="text-xs font-semibold text-sky-700 hover:text-sky-800">
+                                    Clear
+                                </button>
+                            </div>
+                            <div class="mt-2">
+                                <input
+                                    type="text"
+                                    class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-sky-500 focus:ring-sky-500"
+                                    placeholder="Search airlines..."
+                                    data-airline-search
+                                >
+                            </div>
+                            <div class="space-y-2 max-h-60 overflow-y-auto pr-1" data-airline-list>
+                                @forelse ($filterAirlines as $airline)
+                                    <label class="flex items-center gap-3 rounded-lg border border-slate-100 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm transition hover:border-sky-200 hover:bg-slate-50">
+                                        <input
+                                            type="checkbox"
+                                            name="selected_airlines[]"
+                                            value="{{ $airline['code'] }}"
+                                            form="flight-search-form"
+                                            class="h-4 w-4 rounded text-sky-600 focus:ring-sky-500"
+                                            data-airline-filter
+                                            @checked(in_array($airline['code'], $preselectedAirlines, true))
+                                        >
+                                        <span class="flex-1">
+                                            <span class="font-semibold text-slate-900">{{ $airline['code'] }}</span>
+                                            @if ($airline['label'] !== $airline['code'])
+                                                <span class="ml-1 text-slate-500">– {{ $airline['label'] }}</span>
+                                            @endif
+                                        </span>
+                                    </label>
+                                @empty
+                                    <p class="text-sm text-slate-500">No airlines available for this search.</p>
+                                @endforelse
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -592,7 +613,7 @@
                                                     $shouldHideInitial = !empty($preselectedAirlines) && !in_array($primaryCarrier, $preselectedAirlines, true);
                                                 @endphp
 
-                                            <div class="{{ $shouldHideInitial ? 'hidden ' : '' }}flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" data-offer-card data-offer-id="{{ $offer['offer_id'] }}" data-flex-offset="{{ $offset }}" data-airline-code="{{ $primaryCarrier }}" data-offer-price="{{ $totalPayable }}" data-offer-currency="{{ $currency }}">
+                                            <div class="{{ $shouldHideInitial ? 'hidden ' : '' }}flex flex-col gap-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm" data-offer-card data-offer-id="{{ $offer['offer_id'] }}" data-flex-offset="{{ $offset }}" data-airline-code="{{ $primaryCarrier }}" data-offer-price="{{ $totalPayable }}" data-offer-currency="{{ $currency }}" data-interline-type="{{ $offer['interline_type'] ?? '' }}">
                                                     <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                                             <div class="flex items-center gap-3">
                                                                 <div class="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center text-sm font-semibold text-slate-700">
@@ -754,7 +775,7 @@
                                 @endforeach
                             </div>
                             <div class="rounded border border-yellow-200 bg-yellow-50 p-8 text-center text-yellow-900 hidden" data-filter-no-results>
-                                No flight offers match the selected airlines.
+                                No flight offers match the selected filters.
                             </div>
                         @endif
                     </div>
@@ -1516,7 +1537,8 @@
 
                 const setupAirlineFilters = () => {
                     const filterCheckboxes = Array.from(document.querySelectorAll('[data-airline-filter]'));
-                    if (filterCheckboxes.length === 0) {
+                    const interlineSelect = document.getElementById('interline');
+                    if (filterCheckboxes.length === 0 && !interlineSelect) {
                         return;
                     }
 
@@ -1595,7 +1617,7 @@
                         });
                     };
 
-                    const updateHistory = (codes) => {
+                    const updateHistory = (codes, interlineVal) => {
                         if (!window.history || typeof window.history.replaceState !== 'function') {
                             return;
                         }
@@ -1604,6 +1626,11 @@
                             const url = new URL(window.location.href);
                             url.searchParams.delete('selected_airlines[]');
                             codes.forEach((code) => url.searchParams.append('selected_airlines[]', code));
+                            if (interlineVal) {
+                                url.searchParams.set('interline', interlineVal);
+                            } else {
+                                url.searchParams.delete('interline');
+                            }
                             window.history.replaceState({}, document.title, url.toString());
                         } catch (error) {
                             // Ignore history errors on older browsers.
@@ -1617,6 +1644,7 @@
 
                     const applyFilters = () => {
                         const selectedCodes = getSelectedCodes();
+                        const interlineValue = (interlineSelect?.value || '').toUpperCase();
                         const visibleOffers = [];
                         let bucketHasOffers = false;
 
@@ -1627,8 +1655,10 @@
                                 bucketHasOffers = true;
                             }
                             const code = (card.dataset.airlineCode || '').toUpperCase();
+                            const cardInterline = (card.dataset.interlineType || '').toUpperCase();
                             const matchesAirline = selectedCodes.length === 0 || selectedCodes.includes(code);
-                            const shouldShow = matchesBucket && matchesAirline;
+                            const matchesInterline = interlineValue === '' || interlineValue === cardInterline;
+                            const shouldShow = matchesBucket && matchesAirline && matchesInterline;
                             card.classList.toggle('hidden', !shouldShow);
 
                             if (shouldShow) {
@@ -1649,15 +1679,28 @@
                         }
 
                         if (summaryTarget) {
-                            summaryTarget.textContent = selectedCodes.length > 0
-                                ? `Filtered: ${selectedCodes.join(', ')}`
+                            const interlineLabels = {
+                                Y: 'Different marketing carriers',
+                                N: 'Plating carrier only',
+                                D: 'Only other than plating carrier',
+                            };
+                            const summaryParts = [];
+                            if (selectedCodes.length > 0) {
+                                summaryParts.push(`Airlines: ${selectedCodes.join(', ')}`);
+                            }
+                            if (interlineValue && interlineLabels[interlineValue]) {
+                                summaryParts.push(`Interline: ${interlineLabels[interlineValue]}`);
+                            }
+
+                            summaryTarget.textContent = summaryParts.length > 0
+                                ? summaryParts.join(' • ')
                                 : summaryDefault;
                         }
 
                         if (selectionCount) {
-                            selectionCount.textContent = selectedCodes.length === 0
+                            selectionCount.textContent = (selectedCodes.length === 0 && interlineValue === '')
                                 ? 'All'
-                                : `${selectedCodes.length} selected`;
+                                : 'Filtered';
                         }
 
                         if (emptyState) {
@@ -1666,12 +1709,16 @@
                         }
 
                         updateStats(visibleOffers);
-                        updateHistory(selectedCodes);
+                        updateHistory(selectedCodes, interlineValue);
                     };
 
                     filterCheckboxes.forEach((checkbox) => {
                         checkbox.addEventListener('change', applyFilters);
                     });
+
+                    if (interlineSelect) {
+                        interlineSelect.addEventListener('change', applyFilters);
+                    }
 
                     document.querySelectorAll('[data-clear-airline-filters]').forEach((button) => {
                         button.addEventListener('click', (event) => {
@@ -1679,6 +1726,9 @@
                             filterCheckboxes.forEach((checkbox) => {
                                 checkbox.checked = false;
                             });
+                            if (interlineSelect) {
+                                interlineSelect.value = '';
+                            }
                             applyFilters();
                         });
                     });

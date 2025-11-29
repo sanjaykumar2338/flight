@@ -65,13 +65,13 @@
                     </select>
                     <x-input-error :messages="$errors->get('marketing_carriers_rule')" class="mt-1" />
                 </div>
-                <div class="md:col-span-2" x-show="$store.pricingRules.form.marketing_carriers_rule !== '{{ \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION }}'" x-cloak>
+                <div class="md:col-span-2" x-show="$store.pricingRules.form.marketing_carriers_rule !== ''" x-cloak>
                     <x-input-label for="rule_marketing_carriers" value="Carrier IATA code(s)" />
                     <input id="rule_marketing_carriers" name="marketing_carriers" x-model="$store.pricingRules.marketingCarriersText"
                            @input="$store.pricingRules.updateCarrierListFromText('marketing', $event.target.value)"
                            placeholder="Multiple codes separated by comma"
                            class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                    <p class="mt-1 text-xs text-gray-500">Applies when marketing carriers are restricted.</p>
+                    <p class="mt-1 text-xs text-gray-500">Applies when marketing carriers are limited to or excluding a list.</p>
                     <x-input-error :messages="$errors->get('marketing_carriers')" class="mt-1" />
                 </div>
                 <div>
@@ -84,13 +84,13 @@
                     </select>
                     <x-input-error :messages="$errors->get('operating_carriers_rule')" class="mt-1" />
                 </div>
-                <div class="md:col-span-2" x-show="$store.pricingRules.form.operating_carriers_rule !== '{{ \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION }}'" x-cloak>
+                <div class="md:col-span-2" x-show="$store.pricingRules.form.operating_carriers_rule !== ''" x-cloak>
                     <x-input-label for="rule_operating_carriers" value="Carrier IATA code(s)" />
                     <input id="rule_operating_carriers" name="operating_carriers" x-model="$store.pricingRules.operatingCarriersText"
                            @input="$store.pricingRules.updateCarrierListFromText('operating', $event.target.value)"
                            placeholder="Multiple codes separated by comma"
                            class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
-                    <p class="mt-1 text-xs text-gray-500">Applies when operating carriers are restricted.</p>
+                    <p class="mt-1 text-xs text-gray-500">Applies when operating carriers are limited to or excluding a list.</p>
                     <x-input-error :messages="$errors->get('operating_carriers')" class="mt-1" />
                 </div>
             </div>

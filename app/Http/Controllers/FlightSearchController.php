@@ -44,6 +44,8 @@ class FlightSearchController extends Controller
 
         $flexibleDays = $request->flexibleDays();
         $selectedAirlines = $request->airlineFilters();
+        $interlineFilter = strtoupper((string) $request->input('interline', ''));
+        $interlineFilter = in_array($interlineFilter, ['Y', 'N', 'D'], true) ? $interlineFilter : '';
         $airlineLookup = collect(config('airlines', []))
             ->mapWithKeys(fn ($name, $code) => [strtoupper($code) => (string) $name]);
         $airlineOptions = $airlineLookup
@@ -59,7 +61,7 @@ class FlightSearchController extends Controller
         if ($request->hasSearchCriteria()) {
             try {
                 $searchData = FlightSearchData::fromArray($request->validated());
-                $searchResults = $this->travelNdcService->searchFlights($searchData, $flexibleDays, []);
+                $searchResults = $this->travelNdcService->searchFlights($searchData, $flexibleDays, $selectedAirlines);
                 $passengerSummary = $this->buildPassengerSummary($searchData);
 
                 $availableAirlines = collect($searchResults['airlines'])
@@ -72,6 +74,7 @@ class FlightSearchController extends Controller
                 $allOffers = collect($searchResults['offers'])
                     ->map(function (array $offer) use ($searchData, $passengerSummary) {
                         $pricing = Arr::get($offer, 'pricing', []);
+                        $offer['segments'] = $this->hydrateSegments($offer['segments'] ?? []);
                         $carrier = trim((string) Arr::get($offer, 'primary_carrier', Arr::get($offer, 'owner', '')));
                         $currency = $offer['currency'] ?? ($pricing['currency'] ?? config('travelndc.currency', 'USD'));
                         $baseAmount = round((float) ($pricing['base_amount'] ?? 0), 2);
@@ -103,9 +106,11 @@ class FlightSearchController extends Controller
 
                         $offer['passenger_summary'] = $passengerSummary;
                         $offer['pricing_context'] = $context;
+                        $offer['interline_type'] = $this->determineInterlineType($offer, $carrier);
 
                         return $offer;
                     })
+                    ->filter(fn (array $offer) => $this->matchesInterlineSelection($offer['interline_type'] ?? '', $interlineFilter))
                     ->values();
 
                 $flexibleBuckets = $this->buildFlexibleBuckets($allOffers, $sortOption);
@@ -149,6 +154,7 @@ class FlightSearchController extends Controller
                 'infants' => $request->input('infants', 0),
                 'cabin_class' => $request->input('cabin_class', 'ECONOMY'),
                 'sort' => $sortOption,
+                'interline' => $interlineFilter,
             ],
             'selectedAirlines' => $selectedAirlines,
             'airlineOptions' => $airlineOptions,
@@ -335,9 +341,23 @@ class FlightSearchController extends Controller
     private function buildPricingContext(array $offer, FlightSearchData $searchData, string $carrier, string $currency, float $taxAmount): array
     {
         [$origin, $destination] = $this->extractEndpoints($offer, $searchData);
+        $segments = $offer['segments'] ?? [];
+        $marketingCarriers = $this->extractCarrierCodes($segments, 'marketing_carrier');
+        $operatingCarriers = $this->extractCarrierCodes($segments, 'operating_carrier');
+        $platingCarrier = strtoupper($offer['owner'] ?? $carrier);
+        if (empty($marketingCarriers) && $platingCarrier !== '') {
+            $marketingCarriers = [$platingCarrier];
+        }
+        if (empty($operatingCarriers) && $platingCarrier !== '') {
+            $operatingCarriers = [$platingCarrier];
+        }
 
         return [
             'carrier' => strtoupper($carrier),
+            'plating_carrier' => $platingCarrier,
+            'marketing_carriers' => $marketingCarriers,
+            'operating_carriers' => $operatingCarriers,
+            'flight_numbers' => $this->extractFlightNumbers($segments),
             'origin' => $origin,
             'destination' => $destination,
             'travel_type' => $searchData->isRoundTrip() ? 'RT' : 'OW',
@@ -420,6 +440,117 @@ class FlightSearchController extends Controller
         }
 
         return null;
+    }
+
+    /**
+     * @param array<int, mixed> $segments
+     * @return array<int, array<string, mixed>>
+     */
+    private function hydrateSegments(array $segments): array
+    {
+        return collect($segments)
+            ->map(function ($segment) {
+                if (!is_array($segment)) {
+                    return [];
+                }
+
+                $segment['marketing_carrier'] = isset($segment['marketing_carrier'])
+                    ? strtoupper((string) $segment['marketing_carrier'])
+                    : null;
+                $segment['operating_carrier'] = isset($segment['operating_carrier'])
+                    ? strtoupper((string) $segment['operating_carrier'])
+                    : null;
+                $segment['flight_number'] = $segment['flight_number']
+                    ?? $segment['marketing_flight_number']
+                    ?? null;
+                $segment['flight_number'] = $segment['flight_number']
+                    ? strtoupper((string) $segment['flight_number'])
+                    : null;
+
+                return $segment;
+            })
+            ->filter(fn ($segment) => is_array($segment) && !empty($segment))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int, mixed> $segments
+     * @return array<int, string>
+     */
+    private function extractCarrierCodes(array $segments, string $key): array
+    {
+        return collect($segments)
+            ->map(fn ($segment) => is_array($segment) ? strtoupper(trim((string) ($segment[$key] ?? ''))) : '')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int, mixed> $segments
+     * @return array<int, string>
+     */
+    private function extractFlightNumbers(array $segments): array
+    {
+        return collect($segments)
+            ->map(function ($segment) {
+                if (!is_array($segment)) {
+                    return null;
+                }
+
+                $number = $segment['flight_number'] ?? $segment['marketing_flight_number'] ?? null;
+
+                return $number ? strtoupper(trim((string) $number)) : null;
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function determineInterlineType(array $offer, string $carrier): string
+    {
+        $segments = $offer['segments'] ?? [];
+        $marketing = collect($this->extractCarrierCodes($segments, 'marketing_carrier'));
+        $platingCarrier = strtoupper($offer['owner'] ?? $carrier);
+
+        if ($marketing->isEmpty() && $platingCarrier !== '') {
+            $marketing = collect([$platingCarrier]);
+        }
+
+        $uniqueCount = $marketing->count();
+
+        if ($uniqueCount > 1) {
+            return 'Y';
+        }
+
+        if ($platingCarrier === '') {
+            return '';
+        }
+
+        if ($uniqueCount > 0 && $marketing->every(fn ($code) => $code === $platingCarrier)) {
+            return 'N';
+        }
+
+        if ($uniqueCount > 0 && !$marketing->contains($platingCarrier)) {
+            return 'D';
+        }
+
+        return '';
+    }
+
+    private function matchesInterlineSelection(string $offerType, string $selection): bool
+    {
+        $normalizedOffer = strtoupper(trim($offerType));
+        $normalizedSelection = strtoupper(trim($selection));
+
+        if ($normalizedSelection === '') {
+            return true;
+        }
+
+        return $normalizedOffer === $normalizedSelection;
     }
 
     private function detectCurrency(FlightSearchRequest $request): string
