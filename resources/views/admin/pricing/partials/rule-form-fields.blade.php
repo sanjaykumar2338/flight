@@ -176,18 +176,100 @@
         <div class="border-b bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700">Routing</div>
         <div class="space-y-4 p-4">
             <div class="grid gap-4 md:grid-cols-2">
-                <div>
-                    <x-input-label for="rule_origin" value="Origin" />
-                    <input id="rule_origin" name="origin" maxlength="3" x-model="$store.pricingRules.form.origin"
-                           placeholder="Without restrictions"
-                           class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                <div class="space-y-2">
+                    <x-input-label for="rule_origin_mode" value="Origin" />
+                    <select id="rule_origin_mode" name="origin_mode" x-model="$store.pricingRules.form.origin_mode"
+                            @change="$store.pricingRules.onOriginModeChange()"
+                            class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">Without restrictions</option>
+                        <option value="iata">IATA code</option>
+                        <option value="country">Country</option>
+                        <option value="type">Destination type</option>
+                    </select>
+                    <div class="space-y-2" x-show="$store.pricingRules.form.origin_mode === 'iata'" x-cloak>
+                        <input id="rule_origin" name="origin_iata" maxlength="3"
+                               x-model="$store.pricingRules.form.origin_iata"
+                               @input="$store.pricingRules.updateOriginIata($event.target.value)"
+                               placeholder="Origin IATA code"
+                               class="w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="origin_prefer_same_code" value="1"
+                                   x-model="$store.pricingRules.form.origin_prefer_same_code"
+                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            Prefer airport with same code
+                        </label>
+                    </div>
+                    <div class="space-y-2" x-show="$store.pricingRules.form.origin_mode === 'country'" x-cloak>
+                        <select id="rule_origin_country" name="origin_country"
+                                x-model="$store.pricingRules.form.origin_country"
+                                @change="$store.pricingRules.updateOriginCountry($event.target.value)"
+                                class="w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">Select Country</option>
+                            @foreach ($countryOptions as $code => $name)
+                                <option value="{{ $code }}">{{ $name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="space-y-2" x-show="$store.pricingRules.form.origin_mode === 'type'" x-cloak>
+                        <select id="rule_origin_type" name="origin_type"
+                                x-model="$store.pricingRules.form.origin_type"
+                                @change="$store.pricingRules.updateOriginType($event.target.value)"
+                                class="w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">Select Origin Type</option>
+                            @foreach ($locationTypeOptions as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <input type="hidden" name="origin" x-model="$store.pricingRules.form.origin">
                     <x-input-error :messages="$errors->get('origin')" class="mt-1" />
                 </div>
-                <div>
-                    <x-input-label for="rule_destination" value="Destination" />
-                    <input id="rule_destination" name="destination" maxlength="3" x-model="$store.pricingRules.form.destination"
-                           placeholder="Without restrictions"
-                           class="mt-1 w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                <div class="space-y-2">
+                    <x-input-label for="rule_destination_mode" value="Destination" />
+                    <select id="rule_destination_mode" name="destination_mode" x-model="$store.pricingRules.form.destination_mode"
+                            @change="$store.pricingRules.onDestinationModeChange()"
+                            class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                        <option value="">Without restrictions</option>
+                        <option value="iata">IATA code</option>
+                        <option value="country">Country</option>
+                        <option value="type">Destination type</option>
+                    </select>
+                    <div class="space-y-2" x-show="$store.pricingRules.form.destination_mode === 'iata'" x-cloak>
+                        <input id="rule_destination" name="destination_iata" maxlength="3"
+                               x-model="$store.pricingRules.form.destination_iata"
+                               @input="$store.pricingRules.updateDestinationIata($event.target.value)"
+                               placeholder="Destination IATA code"
+                               class="w-full rounded border-gray-300 uppercase shadow-sm focus:border-indigo-500 focus:ring-indigo-500" />
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input type="checkbox" name="destination_prefer_same_code" value="1"
+                                   x-model="$store.pricingRules.form.destination_prefer_same_code"
+                                   class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                            Prefer airport with same code
+                        </label>
+                    </div>
+                    <div class="space-y-2" x-show="$store.pricingRules.form.destination_mode === 'country'" x-cloak>
+                        <select id="rule_destination_country" name="destination_country"
+                                x-model="$store.pricingRules.form.destination_country"
+                                @change="$store.pricingRules.updateDestinationCountry($event.target.value)"
+                                class="w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">Select Country</option>
+                            @foreach ($countryOptions as $code => $name)
+                                <option value="{{ $code }}">{{ $name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="space-y-2" x-show="$store.pricingRules.form.destination_mode === 'type'" x-cloak>
+                        <select id="rule_destination_type" name="destination_type"
+                                x-model="$store.pricingRules.form.destination_type"
+                                @change="$store.pricingRules.updateDestinationType($event.target.value)"
+                                class="w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                            <option value="">Select Destination Type</option>
+                            @foreach ($locationTypeOptions as $value => $label)
+                                <option value="{{ $value }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <input type="hidden" name="destination" x-model="$store.pricingRules.form.destination">
                     <x-input-error :messages="$errors->get('destination')" class="mt-1" />
                 </div>
             </div>
@@ -223,16 +305,28 @@
 
     <div class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
         <div class="border-b bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700">Cabin class</div>
-        <div class="p-4">
-            <x-input-label for="rule_cabin_class" value="Contains" />
-            <select id="rule_cabin_class" name="cabin_class" x-model="$store.pricingRules.form.cabin_class"
-                    class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                <option value="">No restriction</option>
-                @foreach ($cabinClasses as $value => $label)
-                    <option value="{{ $value }}">{{ $label }}</option>
-                @endforeach
-            </select>
-            <x-input-error :messages="$errors->get('cabin_class')" class="mt-1" />
+        <div class="space-y-3 p-4">
+            <div>
+                <x-input-label for="rule_cabin_mode" value="Contains" />
+                <select id="rule_cabin_mode" x-model="$store.pricingRules.form.cabin_mode" @change="$store.pricingRules.onCabinModeChange()"
+                        class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">No restriction</option>
+                    <option value="higher">The one specified or higher</option>
+                    <option value="exact">Only the one specified</option>
+                    <option value="once">At least once</option>
+                </select>
+            </div>
+            <div x-show="$store.pricingRules.form.cabin_mode !== ''" x-cloak>
+                <x-input-label for="rule_cabin_class" value="Cabin class" />
+                <select id="rule_cabin_class" name="cabin_class" x-model="$store.pricingRules.form.cabin_class"
+                        class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                    <option value="">Select cabin</option>
+                    @foreach ($cabinClasses as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <x-input-error :messages="$errors->get('cabin_class')" class="mt-1" />
+            </div>
         </div>
     </div>
 

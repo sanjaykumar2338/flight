@@ -29,6 +29,16 @@
         \App\Models\PricingRule::FLIGHT_RESTRICTION_ONLY_LISTED => 'Only listed flights',
         \App\Models\PricingRule::FLIGHT_RESTRICTION_EXCLUDE_LISTED => 'Exclude listed flights',
     ];
+    $countryOptions = $options['countries'] ?? [
+        'USA' => 'United States',
+        'GBR' => 'United Kingdom',
+        'NGA' => 'Nigeria',
+    ];
+    $locationTypeOptions = [
+        'airport' => 'Airport',
+        'city' => 'City',
+        'station' => 'Station',
+    ];
 @endphp
 
 <x-app-layout>

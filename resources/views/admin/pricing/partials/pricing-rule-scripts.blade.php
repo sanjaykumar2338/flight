@@ -17,12 +17,23 @@
                 flight_numbers: '',
                 usage: '{{ \App\Models\PricingRule::USAGE_COMMISSION_BASE }}',
                 origin: '',
+                origin_mode: '',
+                origin_iata: '',
+                origin_country: '',
+                origin_type: '',
+                origin_prefer_same_code: false,
                 destination: '',
+                destination_mode: '',
+                destination_iata: '',
+                destination_country: '',
+                destination_type: '',
+                destination_prefer_same_code: false,
                 both_ways: false,
                 travel_oneway: true,
                 travel_return: true,
                 travel_type: 'OW+RT',
                 cabin_class: '',
+                cabin_mode: '',
                 booking_class_rbd: '',
                 booking_class_usage: '{{ \App\Models\PricingRule::BOOKING_CLASS_USAGE_AT_LEAST_ONE }}',
                 passenger_types: [],
@@ -83,6 +94,9 @@
                             this.form = defaults();
                             this.syncPassengerTypesText();
                             this.syncCarrierTexts();
+                            this.syncOriginFields();
+                            this.syncDestinationFields();
+                            this.syncCabinModeFromClass();
                         },
                         normalizeCarrierRule,
                         normalizeFlightRestriction,
@@ -141,6 +155,9 @@
                             this.form.travel_return = this.form.travel_type === 'RT' || this.form.travel_type === 'OW+RT';
                             this.syncPassengerTypesText();
                             this.syncCarrierTexts();
+                            this.syncOriginFieldsFromValue();
+                            this.syncDestinationFieldsFromValue();
+                            this.syncCabinModeFromClass();
                             window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
                         },
                         openCopy(rule = {}) {
@@ -157,6 +174,9 @@
                             this.form = data;
                             this.syncPassengerTypesText();
                             this.syncCarrierTexts();
+                            this.syncOriginFieldsFromValue();
+                            this.syncDestinationFieldsFromValue();
+                            this.syncCabinModeFromClass();
                             window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
                         },
                         openDetail(rule = {}) {
@@ -201,6 +221,119 @@
                                 this.form.flat_amount = '';
                             } else if (this.form.amount_mode === 'flat') {
                                 this.form.percent = '';
+                            }
+                        },
+                        onOriginModeChange() {
+                            this.form.origin_mode = (this.form.origin_mode || '').toString();
+                            this.form.origin_iata = '';
+                            this.form.origin_country = '';
+                            this.form.origin_type = '';
+                            this.form.origin_prefer_same_code = false;
+                            this.syncOriginValue();
+                        },
+                        onDestinationModeChange() {
+                            this.form.destination_mode = (this.form.destination_mode || '').toString();
+                            this.form.destination_iata = '';
+                            this.form.destination_country = '';
+                            this.form.destination_type = '';
+                            this.form.destination_prefer_same_code = false;
+                            this.syncDestinationValue();
+                        },
+                        syncOriginValue() {
+                            if (this.form.origin_mode === 'iata') {
+                                this.form.origin = (this.form.origin_iata || '').trim().toUpperCase();
+                            } else {
+                                this.form.origin = '';
+                            }
+                        },
+                        syncDestinationValue() {
+                            if (this.form.destination_mode === 'iata') {
+                                this.form.destination = (this.form.destination_iata || '').trim().toUpperCase();
+                            } else {
+                                this.form.destination = '';
+                            }
+                        },
+                        syncOriginFields() {
+                            this.form.origin_mode = '';
+                            this.form.origin_iata = '';
+                            this.form.origin_country = '';
+                            this.form.origin_type = '';
+                            this.form.origin_prefer_same_code = false;
+                            this.syncOriginValue();
+                        },
+                        syncDestinationFields() {
+                            this.form.destination_mode = '';
+                            this.form.destination_iata = '';
+                            this.form.destination_country = '';
+                            this.form.destination_type = '';
+                            this.form.destination_prefer_same_code = false;
+                            this.syncDestinationValue();
+                        },
+                        syncOriginFieldsFromValue() {
+                            if (this.form.origin) {
+                                this.form.origin_mode = 'iata';
+                                this.form.origin_iata = this.form.origin;
+                            } else {
+                                this.syncOriginFields();
+                            }
+                            this.syncOriginValue();
+                        },
+                        syncDestinationFieldsFromValue() {
+                            if (this.form.destination) {
+                                this.form.destination_mode = 'iata';
+                                this.form.destination_iata = this.form.destination;
+                            } else {
+                                this.syncDestinationFields();
+                            }
+                            this.syncDestinationValue();
+                        },
+                        updateOriginIata(value) {
+                            this.form.origin_iata = (value || '').toString().toUpperCase();
+                            this.syncOriginValue();
+                        },
+                        updateDestinationIata(value) {
+                            this.form.destination_iata = (value || '').toString().toUpperCase();
+                            this.syncDestinationValue();
+                        },
+                        updateOriginCountry(value) {
+                            this.form.origin_country = (value || '').toString();
+                            if (this.form.origin_mode !== 'country') {
+                                return;
+                            }
+                            this.form.origin = '';
+                        },
+                        updateDestinationCountry(value) {
+                            this.form.destination_country = (value || '').toString();
+                            if (this.form.destination_mode !== 'country') {
+                                return;
+                            }
+                            this.form.destination = '';
+                        },
+                        updateOriginType(value) {
+                            this.form.origin_type = (value || '').toString();
+                            if (this.form.origin_mode !== 'type') {
+                                return;
+                            }
+                            this.form.origin = '';
+                        },
+                        updateDestinationType(value) {
+                            this.form.destination_type = (value || '').toString();
+                            if (this.form.destination_mode !== 'type') {
+                                return;
+                            }
+                            this.form.destination = '';
+                        },
+                        onCabinModeChange() {
+                            this.form.cabin_mode = (this.form.cabin_mode || '').toString();
+                            if (this.form.cabin_mode === '') {
+                                this.form.cabin_class = '';
+                            }
+                        },
+                        syncCabinModeFromClass() {
+                            if (this.form.cabin_class) {
+                                this.form.cabin_mode = this.form.cabin_mode || 'exact';
+                            } else {
+                                this.form.cabin_mode = '';
                             }
                         },
                     });
