@@ -8,11 +8,17 @@
         \App\Models\PricingRule::BOOKING_CLASS_USAGE_ONLY_LISTED => 'Must not contain other than listed classes',
         \App\Models\PricingRule::BOOKING_CLASS_USAGE_EXCLUDE_LISTED => 'Must not contain any of listed classes',
     ];
-    $carrierRuleOptions = [
+    $marketingRuleOptions = [
         '' => 'Without restrictions',
         'Y' => 'Different marketing carriers',
         'N' => 'Plating carrier only',
         'D' => 'Only other than plating carrier',
+    ];
+    $operatingRuleOptions = [
+        '' => 'Without restrictions',
+        'S' => 'Only listed are authorized',
+        'N' => 'Not operated by',
+        'A' => 'Must contain all of the listed',
     ];
     $flightRestrictionOptions = [
         \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE => 'Do not restrict',

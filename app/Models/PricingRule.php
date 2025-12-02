@@ -32,6 +32,7 @@ class PricingRule extends Model
     public const AIRLINE_RULE_DIFFERENT_MARKETING = 'different_marketing';
     public const AIRLINE_RULE_PLATING_ONLY = 'plating_only';
     public const AIRLINE_RULE_OTHER_THAN_PLATING = 'other_than_plating';
+    public const AIRLINE_RULE_INCLUDE_ALL = 'include_all';
 
     public const FLIGHT_RESTRICTION_NONE = 'no_restriction';
     public const FLIGHT_RESTRICTION_ONLY_LISTED = 'only_listed';
@@ -110,14 +111,17 @@ class PricingRule extends Model
             self::AIRLINE_RULE_DIFFERENT_MARKETING,
             self::AIRLINE_RULE_PLATING_ONLY,
             self::AIRLINE_RULE_OTHER_THAN_PLATING,
+            self::AIRLINE_RULE_INCLUDE_ALL,
             '', // UI code: Without restrictions
             'Y', // UI code: Different marketing carriers
-            'N', // UI code: Plating carrier only
+            'N', // UI code: Plating carrier only / Not operated by
             'D', // UI code: Only other than plating carrier
+            'S', // UI code: Only listed are authorized (operating)
+            'A', // UI code: Must contain all of the listed (operating)
         ];
     }
 
-    public static function normalizeCarrierRule(?string $value): ?string
+    public static function normalizeMarketingRule(?string $value): ?string
     {
         $normalized = strtoupper(trim((string) $value));
 
@@ -128,6 +132,20 @@ class PricingRule extends Model
             'D', self::AIRLINE_RULE_OTHER_THAN_PLATING => self::AIRLINE_RULE_OTHER_THAN_PLATING,
             self::AIRLINE_RULE_ONLY_LISTED => self::AIRLINE_RULE_DIFFERENT_MARKETING, // legacy map
             self::AIRLINE_RULE_EXCLUDE_LISTED => self::AIRLINE_RULE_OTHER_THAN_PLATING, // legacy map
+            default => null,
+        };
+    }
+
+    public static function normalizeOperatingRule(?string $value): ?string
+    {
+        $normalized = strtoupper(trim((string) $value));
+
+        return match ($normalized) {
+            '', self::AIRLINE_RULE_NO_RESTRICTION => self::AIRLINE_RULE_NO_RESTRICTION,
+            'S', self::AIRLINE_RULE_ONLY_LISTED => self::AIRLINE_RULE_ONLY_LISTED,
+            'N', self::AIRLINE_RULE_EXCLUDE_LISTED => self::AIRLINE_RULE_EXCLUDE_LISTED,
+            'A', self::AIRLINE_RULE_INCLUDE_ALL => self::AIRLINE_RULE_INCLUDE_ALL,
+            self::AIRLINE_RULE_INCLUDE_ALL => self::AIRLINE_RULE_INCLUDE_ALL,
             default => null,
         };
     }

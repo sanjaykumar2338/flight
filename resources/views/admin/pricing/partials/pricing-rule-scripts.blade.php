@@ -55,7 +55,7 @@
                 notes: '',
             });
 
-            const normalizeCarrierRule = (value) => {
+            const normalizeMarketingRule = (value) => {
                 const upper = (value || '').toString().toUpperCase();
                 if (upper === 'Y' || upper === 'N' || upper === 'D' || upper === '') {
                     return upper;
@@ -68,10 +68,24 @@
                         return 'N';
                     case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_OTHER_THAN_PLATING) }}':
                         return 'D';
+                    case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION) }}':
+                    default:
+                        return '';
+                }
+            };
+            const normalizeOperatingRule = (value) => {
+                const upper = (value || '').toString().toUpperCase();
+                if (upper === 'S' || upper === 'N' || upper === 'A' || upper === '') {
+                    return upper;
+                }
+
+                switch (upper) {
                     case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_ONLY_LISTED) }}':
-                        return 'Y';
+                        return 'S';
                     case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_EXCLUDE_LISTED) }}':
-                        return 'D';
+                        return 'N';
+                    case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_INCLUDE_ALL) }}':
+                        return 'A';
                     case '{{ strtoupper(\App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION) }}':
                     default:
                         return '';
@@ -98,7 +112,8 @@
                             this.syncDestinationFields();
                             this.syncCabinModeFromClass();
                         },
-                        normalizeCarrierRule,
+                        normalizeMarketingRule,
+                        normalizeOperatingRule,
                         normalizeFlightRestriction,
                         syncPassengerTypesText() {
                             this.passengerTypesText = (this.form.passenger_types || []).join(', ');
@@ -143,11 +158,18 @@
                                 this.operatingCarriersText = list.join(', ');
                             }
                         },
+                        onOperatingCarrierRuleChange() {
+                            this.form.operating_carriers_rule = this.normalizeCarrierRule(this.form.operating_carriers_rule);
+                            if (this.form.operating_carriers_rule === '') {
+                                this.form.operating_carriers = '';
+                                this.operatingCarriersText = '';
+                            }
+                        },
                         openEdit(rule = {}) {
                             this.mode = 'edit';
                             this.form = Object.assign(defaults(), rule);
-                            this.form.marketing_carriers_rule = this.normalizeCarrierRule(this.form.marketing_carriers_rule);
-                            this.form.operating_carriers_rule = this.normalizeCarrierRule(this.form.operating_carriers_rule);
+                            this.form.marketing_carriers_rule = this.normalizeMarketingRule(this.form.marketing_carriers_rule);
+                            this.form.operating_carriers_rule = this.normalizeOperatingRule(this.form.operating_carriers_rule);
                             this.form.flight_restriction_type = this.normalizeFlightRestriction(this.form.flight_restriction_type);
                             this.form.is_primary_pcc = this.form.is_primary_pcc ? '1' : '0';
                             this.form.amount_mode = (this.form.percent !== '' && this.form.percent !== null) ? 'percent' : 'flat';
@@ -164,8 +186,8 @@
                             this.mode = 'create';
                             const data = Object.assign(defaults(), rule);
                             data.id = null;
-                            data.marketing_carriers_rule = this.normalizeCarrierRule(data.marketing_carriers_rule);
-                            data.operating_carriers_rule = this.normalizeCarrierRule(data.operating_carriers_rule);
+                            data.marketing_carriers_rule = this.normalizeMarketingRule(data.marketing_carriers_rule);
+                            data.operating_carriers_rule = this.normalizeOperatingRule(data.operating_carriers_rule);
                             data.flight_restriction_type = this.normalizeFlightRestriction(data.flight_restriction_type);
                             data.is_primary_pcc = data.is_primary_pcc ? '1' : '0';
                             data.amount_mode = (data.percent !== '' && data.percent !== null) ? 'percent' : 'flat';
@@ -181,8 +203,8 @@
                         },
                         openDetail(rule = {}) {
                             this.detail = Object.assign(defaults(), rule);
-                            this.detail.marketing_carriers_rule = this.normalizeCarrierRule(this.detail.marketing_carriers_rule);
-                            this.detail.operating_carriers_rule = this.normalizeCarrierRule(this.detail.operating_carriers_rule);
+                            this.detail.marketing_carriers_rule = this.normalizeMarketingRule(this.detail.marketing_carriers_rule);
+                            this.detail.operating_carriers_rule = this.normalizeOperatingRule(this.detail.operating_carriers_rule);
                             this.detail.flight_restriction_type = this.normalizeFlightRestriction(this.detail.flight_restriction_type);
                             this.detail.marketing_carriers_list = Array.isArray(this.detail.marketing_carriers) ? this.detail.marketing_carriers.join(', ') : '';
                             this.detail.operating_carriers_list = Array.isArray(this.detail.operating_carriers) ? this.detail.operating_carriers.join(', ') : '';

@@ -10,19 +10,26 @@
         \App\Models\PricingRule::BOOKING_CLASS_USAGE_EXCLUDE_LISTED => 'Must not contain any of listed classes',
     ];
     $carrierOptions = $options['carriers'] ?? [];
-    $carrierRuleOptions = [
+    $marketingRuleOptions = [
         '' => 'Without restrictions',
         'Y' => 'Different marketing carriers',
         'N' => 'Plating carrier only',
         'D' => 'Only other than plating carrier',
     ];
-    $carrierRuleDisplayOptions = array_merge($carrierRuleOptions, [
+    $operatingRuleOptions = [
+        '' => 'Without restrictions',
+        'S' => 'Only listed are authorized',
+        'N' => 'Not operated by',
+        'A' => 'Must contain all of the listed',
+    ];
+    $carrierRuleDisplayOptions = array_merge($marketingRuleOptions, $operatingRuleOptions, [
         \App\Models\PricingRule::AIRLINE_RULE_NO_RESTRICTION => 'Without restrictions',
         \App\Models\PricingRule::AIRLINE_RULE_DIFFERENT_MARKETING => 'Different marketing carriers',
         \App\Models\PricingRule::AIRLINE_RULE_PLATING_ONLY => 'Plating carrier only',
         \App\Models\PricingRule::AIRLINE_RULE_OTHER_THAN_PLATING => 'Only other than plating carrier',
         \App\Models\PricingRule::AIRLINE_RULE_ONLY_LISTED => 'Only listed are authorized',
-        \App\Models\PricingRule::AIRLINE_RULE_EXCLUDE_LISTED => 'Exclude listed carriers',
+        \App\Models\PricingRule::AIRLINE_RULE_EXCLUDE_LISTED => 'Not operated by',
+        \App\Models\PricingRule::AIRLINE_RULE_INCLUDE_ALL => 'Must contain all of the listed',
     ]);
     $flightRestrictionOptions = [
         \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE => 'Do not restrict',

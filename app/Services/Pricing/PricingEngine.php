@@ -329,7 +329,9 @@ class PricingEngine
         array $otherCarriers = [],
         ?string $platingCarrier = null
     ): bool {
-        $ruleType = PricingRule::normalizeCarrierRule($ruleType) ?? PricingRule::AIRLINE_RULE_NO_RESTRICTION;
+        $ruleType = PricingRule::normalizeOperatingRule($ruleType)
+            ?? PricingRule::normalizeMarketingRule($ruleType)
+            ?? PricingRule::AIRLINE_RULE_NO_RESTRICTION;
         $ruleCodes = $this->normalizeCodes($ruleList);
         $contextCodes = $this->normalizeCodes($contextList);
         $plating = $this->normalizeCode($platingCarrier);
@@ -351,6 +353,7 @@ class PricingEngine
             PricingRule::AIRLINE_RULE_DIFFERENT_MARKETING => count($contextCodes) > 1,
             PricingRule::AIRLINE_RULE_PLATING_ONLY => $plating !== null && !empty($contextCodes) && count(array_unique(array_merge($contextCodes, [$plating]))) === 1,
             PricingRule::AIRLINE_RULE_OTHER_THAN_PLATING => $plating !== null && !empty($contextCodes) && !in_array($plating, $contextCodes, true),
+            PricingRule::AIRLINE_RULE_INCLUDE_ALL => !empty($ruleCodes) && empty(array_diff($ruleCodes, $contextCodes)),
             default => true,
         };
     }

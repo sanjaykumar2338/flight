@@ -59,7 +59,7 @@
                     <x-input-label for="rule_marketing_carriers_rule" value="Marketing carriers" />
                     <select id="rule_marketing_carriers_rule" name="marketing_carriers_rule" x-model="$store.pricingRules.form.marketing_carriers_rule"
                             class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        @foreach ($carrierRuleOptions as $value => $label)
+                        @foreach ($marketingRuleOptions as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
                     </select>
@@ -77,8 +77,9 @@
                 <div>
                     <x-input-label for="rule_operating_carriers_rule" value="Operating carriers" />
                     <select id="rule_operating_carriers_rule" name="operating_carriers_rule" x-model="$store.pricingRules.form.operating_carriers_rule"
+                            @change="$store.pricingRules.onOperatingCarrierRuleChange()"
                             class="mt-1 w-full rounded border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
-                        @foreach ($carrierRuleOptions as $value => $label)
+                        @foreach ($operatingRuleOptions as $value => $label)
                             <option value="{{ $value }}">{{ $label }}</option>
                         @endforeach
                     </select>
