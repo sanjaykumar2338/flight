@@ -459,9 +459,85 @@
                     </div>
                 @endif
 
-                <div class="mt-6 rounded-lg border border-gray-200 bg-gray-50 p-6 text-sm text-gray-700">
-                    <p class="font-semibold text-gray-800">Detailed rule list hidden</p>
-                    <p class="mt-1">To keep commissions simple, only the overview above is shown. Use “Add a rule” to create or update a commission.</p>
+                <div class="mt-6 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                    ID
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                    Priority
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                    Carrier
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                    Usage
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                    Scope
+                                </th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                                    Status
+                                </th>
+                                <th scope="col" class="relative px-6 py-3">
+                                    <span class="sr-only">Actions</span>
+                                </th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 bg-white">
+                            @forelse ($rules as $rule)
+                                <tr>
+                                    <td class="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                                        {{ $rule->id }}
+                                    </td>
+                                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                                        {{ $rule->priority }}
+                                    </td>
+                                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                                        {{ $rule->carrier ?: 'All' }}
+                                    </td>
+                                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                                        {{ $usageOptions[$rule->usage] ?? $rule->usage }}
+                                    </td>
+                                    <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                                        {{ $rule->origin ?: 'Any' }} -> {{ $rule->destination ?: 'Any' }}
+                                    </td>
+                                     <td class="whitespace-nowrap px-6 py-4 text-sm text-gray-500">
+                                        @if($rule->active)
+                                            <span class="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+                                                Active
+                                            </span>
+                                        @else
+                                            <span class="inline-flex items-center rounded-full bg-rose-100 px-2.5 py-0.5 text-xs font-medium text-rose-800">
+                                                Inactive
+                                            </span>
+                                        @endif
+                                    </td>
+                                    <td class="whitespace-nowrap px-6 py-4 text-right text-sm font-medium">
+                                        <div class="flex items-center justify-end space-x-4">
+                                            <a href="{{ route('admin.pricing.rules.edit', $rule) }}" class="text-indigo-600 hover:text-indigo-900">Edit</a>
+                                            <form action="{{ route('admin.pricing.rules.destroy', $rule) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this rule?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="text-red-600 hover:text-red-900">Delete</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="7" class="whitespace-nowrap px-6 py-4 text-center text-sm text-gray-500">
+                                        No pricing rules found.
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+                <div class="mt-4">
+                    {{ $rules->links() }}
                 </div>
             </div>
 
