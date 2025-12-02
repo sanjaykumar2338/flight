@@ -437,11 +437,12 @@
                                             </td>
                                             <td class="px-3 py-2 text-gray-700">
                                                 <div class="flex gap-3">
-                                                    <button type="button"
-                                                        class="text-sm font-semibold text-indigo-600 hover:underline"
-                                                        @click="openEdit(@js($ruleData))">
-                                                        Edit
-                                                    </button>
+                                                <a
+                                                    class="text-sm font-semibold text-indigo-600 hover:underline"
+                                                    href="{{ route('admin.pricing.rules.edit', ['pricingRule' => $rule->id, 'return_url' => request()->fullUrl()]) }}"
+                                                >
+                                                    Edit
+                                                </a>
                                                     <form method="POST" action="{{ route('admin.pricing.rules.destroy', $rule) }}" onsubmit="return confirm('Delete this rule?');">
                                                         @csrf
                                                         @method('DELETE')

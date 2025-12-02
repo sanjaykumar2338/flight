@@ -1,6 +1,31 @@
 @push('scripts')
     <script>
-        document.addEventListener('alpine:init', () => {
+        (function () {
+            // Ensure a usable Alpine.store interface immediately, even if Alpine loads later.
+            if (!window.Alpine) {
+                window.Alpine = {
+                    _stores: {},
+                    store(name, value) {
+                        if (value !== undefined) {
+                            this._stores[name] = value;
+                        }
+                        return this._stores[name];
+                    },
+                };
+            } else if (!window.Alpine._stores) {
+                window.Alpine._stores = {};
+                const originalStore = window.Alpine.store.bind(window.Alpine);
+                window.Alpine.store = function (name, value) {
+                    if (value !== undefined) {
+                        this._stores[name] = value;
+                    }
+                    return originalStore(name, value) ?? this._stores[name];
+                };
+            }
+
+            const serverInitialRule = window.pricingRuleInitial || null;
+            const serverOld = window.pricingRuleOld || {};
+
             const defaults = () => ({
                 id: null,
                 priority: 0,
@@ -94,274 +119,296 @@
             const normalizeFlightRestriction = (value) => value || '{{ \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE }}';
 
             const initStore = (config = {}) => {
-                if (!Alpine.store('pricingRules')) {
-                    Alpine.store('pricingRules', {
-                        mode: 'create',
-                        form: defaults(),
-                        detail: defaults(),
-                        passengerTypesText: '',
-                        marketingCarriersText: '',
-                        operatingCarriersText: '',
-                        config,
-                        defaults,
-                        resetForm() {
-                            this.form = defaults();
-                            this.syncPassengerTypesText();
-                            this.syncCarrierTexts();
-                            this.syncOriginFields();
-                            this.syncDestinationFields();
-                            this.syncCabinModeFromClass();
-                        },
-                        normalizeMarketingRule,
-                        normalizeOperatingRule,
-                        normalizeFlightRestriction,
-                        syncPassengerTypesText() {
-                            this.passengerTypesText = (this.form.passenger_types || []).join(', ');
-                        },
-                        updatePassengerTypesFromText(text) {
-                            if (typeof text !== 'string') {
-                                this.form.passenger_types = [];
-                                this.passengerTypesText = '';
-                                return;
-                            }
-
-                            const parsed = text
-                                .split(',')
-                                .map((value) => value.trim().toUpperCase())
-                                .filter((value) => value.length > 0)
-                                .filter((value, index, array) => array.indexOf(value) === index);
-
-                            this.form.passenger_types = parsed;
-                            this.passengerTypesText = parsed.join(', ');
-                        },
-                        syncCarrierTexts() {
-                            this.marketingCarriersText = Array.isArray(this.form.marketing_carriers)
-                                ? this.form.marketing_carriers.join(', ')
-                                : (this.form.marketing_carriers || '');
-                            this.operatingCarriersText = Array.isArray(this.form.operating_carriers)
-                                ? this.form.operating_carriers.join(', ')
-                                : (this.form.operating_carriers || '');
-                        },
-                        updateCarrierListFromText(type, text) {
-                            const list = (typeof text === 'string' ? text : '')
-                                .split(',')
-                                .map((value) => value.trim().toUpperCase())
-                                .filter((value) => value.length > 0)
-                                .filter((value, index, array) => array.indexOf(value) === index);
-
-                            if (type === 'marketing') {
-                                this.form.marketing_carriers = list;
-                                this.marketingCarriersText = list.join(', ');
-                            }
-                            if (type === 'operating') {
-                                this.form.operating_carriers = list;
-                                this.operatingCarriersText = list.join(', ');
-                            }
-                        },
-                        onOperatingCarrierRuleChange() {
-                            this.form.operating_carriers_rule = this.normalizeCarrierRule(this.form.operating_carriers_rule);
-                            if (this.form.operating_carriers_rule === '') {
-                                this.form.operating_carriers = '';
-                                this.operatingCarriersText = '';
-                            }
-                        },
-                        openEdit(rule = {}) {
-                            this.mode = 'edit';
-                            this.form = Object.assign(defaults(), rule);
-                            this.form.marketing_carriers_rule = this.normalizeMarketingRule(this.form.marketing_carriers_rule);
-                            this.form.operating_carriers_rule = this.normalizeOperatingRule(this.form.operating_carriers_rule);
-                            this.form.flight_restriction_type = this.normalizeFlightRestriction(this.form.flight_restriction_type);
-                            this.form.is_primary_pcc = this.form.is_primary_pcc ? '1' : '0';
-                            this.form.amount_mode = (this.form.percent !== '' && this.form.percent !== null) ? 'percent' : 'flat';
-                            this.form.travel_oneway = this.form.travel_type === 'OW' || this.form.travel_type === 'OW+RT';
-                            this.form.travel_return = this.form.travel_type === 'RT' || this.form.travel_type === 'OW+RT';
-                            this.syncPassengerTypesText();
-                            this.syncCarrierTexts();
-                            this.syncOriginFieldsFromValue();
-                            this.syncDestinationFieldsFromValue();
-                            this.syncCabinModeFromClass();
-                            window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
-                        },
-                        openCopy(rule = {}) {
-                            this.mode = 'create';
-                            const data = Object.assign(defaults(), rule);
-                            data.id = null;
-                            data.marketing_carriers_rule = this.normalizeMarketingRule(data.marketing_carriers_rule);
-                            data.operating_carriers_rule = this.normalizeOperatingRule(data.operating_carriers_rule);
-                            data.flight_restriction_type = this.normalizeFlightRestriction(data.flight_restriction_type);
-                            data.is_primary_pcc = data.is_primary_pcc ? '1' : '0';
-                            data.amount_mode = (data.percent !== '' && data.percent !== null) ? 'percent' : 'flat';
-                            data.travel_oneway = data.travel_type === 'OW' || data.travel_type === 'OW+RT';
-                            data.travel_return = data.travel_type === 'RT' || data.travel_type === 'OW+RT';
-                            this.form = data;
-                            this.syncPassengerTypesText();
-                            this.syncCarrierTexts();
-                            this.syncOriginFieldsFromValue();
-                            this.syncDestinationFieldsFromValue();
-                            this.syncCabinModeFromClass();
-                            window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
-                        },
-                        openDetail(rule = {}) {
-                            this.detail = Object.assign(defaults(), rule);
-                            this.detail.marketing_carriers_rule = this.normalizeMarketingRule(this.detail.marketing_carriers_rule);
-                            this.detail.operating_carriers_rule = this.normalizeOperatingRule(this.detail.operating_carriers_rule);
-                            this.detail.flight_restriction_type = this.normalizeFlightRestriction(this.detail.flight_restriction_type);
-                            this.detail.marketing_carriers_list = Array.isArray(this.detail.marketing_carriers) ? this.detail.marketing_carriers.join(', ') : '';
-                            this.detail.operating_carriers_list = Array.isArray(this.detail.operating_carriers) ? this.detail.operating_carriers.join(', ') : '';
-                            window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-detail' }));
-                        },
-                        formAction() {
-                            if (this.mode === 'edit' && this.form.id) {
-                                return `${this.config.updateBaseUrl}/${this.form.id}`;
-                            }
-
-                            return this.config.createUrl;
-                        },
-                        modeTitle() {
-                            if (this.mode === 'edit' && this.form.id) {
-                                return `Edit rule #${this.form.id}`;
-                            }
-
-                            return 'Create pricing rule';
-                        },
-                        updateTravelType() {
-                            const oneway = !!this.form.travel_oneway;
-                            const rt = !!this.form.travel_return;
-
-                            if (oneway && rt) {
-                                this.form.travel_type = 'OW+RT';
-                            } else if (oneway) {
-                                this.form.travel_type = 'OW';
-                            } else if (rt) {
-                                this.form.travel_type = 'RT';
-                            } else {
-                                this.form.travel_type = '';
-                            }
-                        },
-                        syncAmountMode() {
-                            if (this.form.amount_mode === 'percent') {
-                                this.form.flat_amount = '';
-                            } else if (this.form.amount_mode === 'flat') {
-                                this.form.percent = '';
-                            }
-                        },
-                        onOriginModeChange() {
-                            this.form.origin_mode = (this.form.origin_mode || '').toString();
-                            this.form.origin_iata = '';
-                            this.form.origin_country = '';
-                            this.form.origin_type = '';
-                            this.form.origin_prefer_same_code = false;
-                            this.syncOriginValue();
-                        },
-                        onDestinationModeChange() {
-                            this.form.destination_mode = (this.form.destination_mode || '').toString();
-                            this.form.destination_iata = '';
-                            this.form.destination_country = '';
-                            this.form.destination_type = '';
-                            this.form.destination_prefer_same_code = false;
-                            this.syncDestinationValue();
-                        },
-                        syncOriginValue() {
-                            if (this.form.origin_mode === 'iata') {
-                                this.form.origin = (this.form.origin_iata || '').trim().toUpperCase();
-                            } else {
-                                this.form.origin = '';
-                            }
-                        },
-                        syncDestinationValue() {
-                            if (this.form.destination_mode === 'iata') {
-                                this.form.destination = (this.form.destination_iata || '').trim().toUpperCase();
-                            } else {
-                                this.form.destination = '';
-                            }
-                        },
-                        syncOriginFields() {
-                            this.form.origin_mode = '';
-                            this.form.origin_iata = '';
-                            this.form.origin_country = '';
-                            this.form.origin_type = '';
-                            this.form.origin_prefer_same_code = false;
-                            this.syncOriginValue();
-                        },
-                        syncDestinationFields() {
-                            this.form.destination_mode = '';
-                            this.form.destination_iata = '';
-                            this.form.destination_country = '';
-                            this.form.destination_type = '';
-                            this.form.destination_prefer_same_code = false;
-                            this.syncDestinationValue();
-                        },
-                        syncOriginFieldsFromValue() {
-                            if (this.form.origin) {
-                                this.form.origin_mode = 'iata';
-                                this.form.origin_iata = this.form.origin;
-                            } else {
-                                this.syncOriginFields();
-                            }
-                            this.syncOriginValue();
-                        },
-                        syncDestinationFieldsFromValue() {
-                            if (this.form.destination) {
-                                this.form.destination_mode = 'iata';
-                                this.form.destination_iata = this.form.destination;
-                            } else {
-                                this.syncDestinationFields();
-                            }
-                            this.syncDestinationValue();
-                        },
-                        updateOriginIata(value) {
-                            this.form.origin_iata = (value || '').toString().toUpperCase();
-                            this.syncOriginValue();
-                        },
-                        updateDestinationIata(value) {
-                            this.form.destination_iata = (value || '').toString().toUpperCase();
-                            this.syncDestinationValue();
-                        },
-                        updateOriginCountry(value) {
-                            this.form.origin_country = (value || '').toString();
-                            if (this.form.origin_mode !== 'country') {
-                                return;
-                            }
-                            this.form.origin = '';
-                        },
-                        updateDestinationCountry(value) {
-                            this.form.destination_country = (value || '').toString();
-                            if (this.form.destination_mode !== 'country') {
-                                return;
-                            }
-                            this.form.destination = '';
-                        },
-                        updateOriginType(value) {
-                            this.form.origin_type = (value || '').toString();
-                            if (this.form.origin_mode !== 'type') {
-                                return;
-                            }
-                            this.form.origin = '';
-                        },
-                        updateDestinationType(value) {
-                            this.form.destination_type = (value || '').toString();
-                            if (this.form.destination_mode !== 'type') {
-                                return;
-                            }
-                            this.form.destination = '';
-                        },
-                        onCabinModeChange() {
-                            this.form.cabin_mode = (this.form.cabin_mode || '').toString();
-                            if (this.form.cabin_mode === '') {
-                                this.form.cabin_class = '';
-                            }
-                        },
-                        syncCabinModeFromClass() {
-                            if (this.form.cabin_class) {
-                                this.form.cabin_mode = this.form.cabin_mode || 'exact';
-                            } else {
-                                this.form.cabin_mode = '';
-                            }
-                        },
-                    });
+                const existing = Alpine.store('pricingRules');
+                if (existing) {
+                    existing.config = Object.assign(existing.config || {}, config);
+                    return existing;
                 }
 
+                Alpine.store('pricingRules', {
+                    mode: 'create',
+                    form: defaults(),
+                    detail: defaults(),
+                    passengerTypesText: '',
+                    marketingCarriersText: '',
+                    operatingCarriersText: '',
+                    config: Object.assign({ useModal: true }, config),
+                    defaults,
+                    resetForm() {
+                        this.form = defaults();
+                        this.syncPassengerTypesText();
+                        this.syncCarrierTexts();
+                        this.syncOriginFields();
+                        this.syncDestinationFields();
+                        this.syncCabinModeFromClass();
+                    },
+                    normalizeMarketingRule,
+                    normalizeOperatingRule,
+                    normalizeFlightRestriction,
+                    syncPassengerTypesText() {
+                        this.passengerTypesText = (this.form.passenger_types || []).join(', ');
+                    },
+                    updatePassengerTypesFromText(text) {
+                        if (typeof text !== 'string') {
+                            this.form.passenger_types = [];
+                            this.passengerTypesText = '';
+                            return;
+                        }
+
+                        const parsed = text
+                            .split(',')
+                            .map((value) => value.trim().toUpperCase())
+                            .filter((value) => value.length > 0)
+                            .filter((value, index, array) => array.indexOf(value) === index);
+
+                        this.form.passenger_types = parsed;
+                        this.passengerTypesText = parsed.join(', ');
+                    },
+                    syncCarrierTexts() {
+                        this.marketingCarriersText = Array.isArray(this.form.marketing_carriers)
+                            ? this.form.marketing_carriers.join(', ')
+                            : (this.form.marketing_carriers || '');
+                        this.operatingCarriersText = Array.isArray(this.form.operating_carriers)
+                            ? this.form.operating_carriers.join(', ')
+                            : (this.form.operating_carriers || '');
+                    },
+                    updateCarrierListFromText(type, text) {
+                        const list = (typeof text === 'string' ? text : '')
+                            .split(',')
+                            .map((value) => value.trim().toUpperCase())
+                            .filter((value) => value.length > 0)
+                            .filter((value, index, array) => array.indexOf(value) === index);
+
+                        if (type === 'marketing') {
+                            this.form.marketing_carriers = list;
+                            this.marketingCarriersText = list.join(', ');
+                        }
+                        if (type === 'operating') {
+                            this.form.operating_carriers = list;
+                            this.operatingCarriersText = list.join(', ');
+                        }
+                    },
+                    onOperatingCarrierRuleChange() {
+                        this.form.operating_carriers_rule = this.normalizeOperatingRule(this.form.operating_carriers_rule);
+                        if (this.form.operating_carriers_rule === '') {
+                            this.form.operating_carriers = '';
+                            this.operatingCarriersText = '';
+                        }
+                    },
+                    openEdit(rule = {}) {
+                        this.mode = 'edit';
+                        this.form = Object.assign(defaults(), rule);
+                        this.form.marketing_carriers_rule = this.normalizeMarketingRule(this.form.marketing_carriers_rule);
+                        this.form.operating_carriers_rule = this.normalizeOperatingRule(this.form.operating_carriers_rule);
+                        this.form.flight_restriction_type = this.normalizeFlightRestriction(this.form.flight_restriction_type);
+                        this.form.is_primary_pcc = this.form.is_primary_pcc ? '1' : '0';
+                        this.form.amount_mode = (this.form.percent !== '' && this.form.percent !== null) ? 'percent' : 'flat';
+                        this.form.travel_oneway = this.form.travel_type === 'OW' || this.form.travel_type === 'OW+RT';
+                        this.form.travel_return = this.form.travel_type === 'RT' || this.form.travel_type === 'OW+RT';
+                        this.syncPassengerTypesText();
+                        this.syncCarrierTexts();
+                        this.syncOriginFieldsFromValue();
+                        this.syncDestinationFieldsFromValue();
+                        this.syncCabinModeFromClass();
+                        if (this.config.useModal !== false) {
+                            window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
+                        }
+                    },
+                    openCopy(rule = {}) {
+                        this.mode = 'create';
+                        const data = Object.assign(defaults(), rule);
+                        data.id = null;
+                        data.marketing_carriers_rule = this.normalizeMarketingRule(data.marketing_carriers_rule);
+                        data.operating_carriers_rule = this.normalizeOperatingRule(data.operating_carriers_rule);
+                        data.flight_restriction_type = this.normalizeFlightRestriction(data.flight_restriction_type);
+                        data.is_primary_pcc = data.is_primary_pcc ? '1' : '0';
+                        data.amount_mode = (data.percent !== '' && data.percent !== null) ? 'percent' : 'flat';
+                        data.travel_oneway = data.travel_type === 'OW' || data.travel_type === 'OW+RT';
+                        data.travel_return = data.travel_type === 'RT' || data.travel_type === 'OW+RT';
+                        this.form = data;
+                        this.syncPassengerTypesText();
+                        this.syncCarrierTexts();
+                        this.syncOriginFieldsFromValue();
+                        this.syncDestinationFieldsFromValue();
+                        this.syncCabinModeFromClass();
+                        if (this.config.useModal !== false) {
+                            window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-modal' }));
+                        }
+                    },
+                    openDetail(rule = {}) {
+                        this.detail = Object.assign(defaults(), rule);
+                        this.detail.marketing_carriers_rule = this.normalizeMarketingRule(this.detail.marketing_carriers_rule);
+                        this.detail.operating_carriers_rule = this.normalizeOperatingRule(this.detail.operating_carriers_rule);
+                        this.detail.flight_restriction_type = this.normalizeFlightRestriction(this.detail.flight_restriction_type);
+                        this.detail.marketing_carriers_list = Array.isArray(this.detail.marketing_carriers) ? this.detail.marketing_carriers.join(', ') : '';
+                        this.detail.operating_carriers_list = Array.isArray(this.detail.operating_carriers) ? this.detail.operating_carriers.join(', ') : '';
+                        if (this.config.useModal !== false) {
+                            window.dispatchEvent(new CustomEvent('open-modal', { detail: 'pricing-rule-detail' }));
+                        }
+                    },
+                    formAction() {
+                        if (this.mode === 'edit' && this.form.id) {
+                            return `${this.config.updateBaseUrl}/${this.form.id}`;
+                        }
+
+                        return this.config.createUrl;
+                    },
+                    modeTitle() {
+                        if (this.mode === 'edit' && this.form.id) {
+                            return `Edit rule #${this.form.id}`;
+                        }
+
+                        return 'Create pricing rule';
+                    },
+                    updateTravelType() {
+                        const oneway = !!this.form.travel_oneway;
+                        const rt = !!this.form.travel_return;
+
+                        if (oneway && rt) {
+                            this.form.travel_type = 'OW+RT';
+                        } else if (oneway) {
+                            this.form.travel_type = 'OW';
+                        } else if (rt) {
+                            this.form.travel_type = 'RT';
+                        } else {
+                            this.form.travel_type = '';
+                        }
+                    },
+                    syncAmountMode() {
+                        if (this.form.amount_mode === 'percent') {
+                            this.form.flat_amount = '';
+                        } else if (this.form.amount_mode === 'flat') {
+                            this.form.percent = '';
+                        }
+                    },
+                    onOriginModeChange() {
+                        this.form.origin_mode = (this.form.origin_mode || '').toString();
+                        this.form.origin_iata = '';
+                        this.form.origin_country = '';
+                        this.form.origin_type = '';
+                        this.form.origin_prefer_same_code = false;
+                        this.syncOriginValue();
+                    },
+                    onDestinationModeChange() {
+                        this.form.destination_mode = (this.form.destination_mode || '').toString();
+                        this.form.destination_iata = '';
+                        this.form.destination_country = '';
+                        this.form.destination_type = '';
+                        this.form.destination_prefer_same_code = false;
+                        this.syncDestinationValue();
+                    },
+                    syncOriginValue() {
+                        if (this.form.origin_mode === 'iata') {
+                            this.form.origin = (this.form.origin_iata || '').trim().toUpperCase();
+                        } else {
+                            this.form.origin = '';
+                        }
+                    },
+                    syncDestinationValue() {
+                        if (this.form.destination_mode === 'iata') {
+                            this.form.destination = (this.form.destination_iata || '').trim().toUpperCase();
+                        } else {
+                            this.form.destination = '';
+                        }
+                    },
+                    syncOriginFields() {
+                        this.form.origin_mode = '';
+                        this.form.origin_iata = '';
+                        this.form.origin_country = '';
+                        this.form.origin_type = '';
+                        this.form.origin_prefer_same_code = false;
+                        this.syncOriginValue();
+                    },
+                    syncDestinationFields() {
+                        this.form.destination_mode = '';
+                        this.form.destination_iata = '';
+                        this.form.destination_country = '';
+                        this.form.destination_type = '';
+                        this.form.destination_prefer_same_code = false;
+                        this.syncDestinationValue();
+                    },
+                    syncOriginFieldsFromValue() {
+                        if (this.form.origin) {
+                            this.form.origin_mode = 'iata';
+                            this.form.origin_iata = this.form.origin;
+                        } else {
+                            this.syncOriginFields();
+                        }
+                        this.syncOriginValue();
+                    },
+                    syncDestinationFieldsFromValue() {
+                        if (this.form.destination) {
+                            this.form.destination_mode = 'iata';
+                            this.form.destination_iata = this.form.destination;
+                        } else {
+                            this.syncDestinationFields();
+                        }
+                        this.syncDestinationValue();
+                    },
+                    updateOriginIata(value) {
+                        this.form.origin_iata = (value || '').toString().toUpperCase();
+                        this.syncOriginValue();
+                    },
+                    updateDestinationIata(value) {
+                        this.form.destination_iata = (value || '').toString().toUpperCase();
+                        this.syncDestinationValue();
+                    },
+                    updateOriginCountry(value) {
+                        this.form.origin_country = (value || '').toString();
+                        if (this.form.origin_mode !== 'country') {
+                            return;
+                        }
+                        this.form.origin = '';
+                    },
+                    updateDestinationCountry(value) {
+                        this.form.destination_country = (value || '').toString();
+                        if (this.form.destination_mode !== 'country') {
+                            return;
+                        }
+                        this.form.destination = '';
+                    },
+                    updateOriginType(value) {
+                        this.form.origin_type = (value || '').toString();
+                        if (this.form.origin_mode !== 'type') {
+                            return;
+                        }
+                        this.form.origin = '';
+                    },
+                    updateDestinationType(value) {
+                        this.form.destination_type = (value || '').toString();
+                        if (this.form.destination_mode !== 'type') {
+                            return;
+                        }
+                        this.form.destination = '';
+                    },
+                    onCabinModeChange() {
+                        this.form.cabin_mode = (this.form.cabin_mode || '').toString();
+                        if (this.form.cabin_mode === '') {
+                            this.form.cabin_class = '';
+                        }
+                    },
+                    syncCabinModeFromClass() {
+                        if (this.form.cabin_class) {
+                            this.form.cabin_mode = this.form.cabin_mode || 'exact';
+                        } else {
+                            this.form.cabin_mode = '';
+                        }
+                    },
+                });
                 const store = Alpine.store('pricingRules');
+                const hasServerRule = serverInitialRule && serverInitialRule.id;
+                const hasOld = serverOld && Object.keys(serverOld).length > 0;
+                if (hasServerRule) {
+                    store.openEdit(Object.assign({}, serverInitialRule, hasOld ? serverOld : {}));
+                } else if (hasOld) {
+                    store.form = Object.assign(store.defaults(), serverOld);
+                    store.syncPassengerTypesText();
+                    store.syncCarrierTexts();
+                    store.syncOriginFieldsFromValue();
+                    store.syncDestinationFieldsFromValue();
+                    store.syncCabinModeFromClass();
+                }
+
                 store.config = config;
 
                 return store;
@@ -370,31 +417,58 @@
             Alpine.data('pricingRulesPage', (config) => ({
                 init() {
                     initStore(config);
-                },
-                store() {
-                    return Alpine.store('pricingRules');
-                },
-                openEdit(rule) {
-                    this.store().openEdit(rule);
-                },
-                openCopy(rule) {
-                    this.store().openCopy(rule);
-                },
-                openDetail(rule) {
-                    this.store().openDetail(rule);
-                },
-            }));
+                    },
+                    store() {
+                        return Alpine.store('pricingRules');
+                    },
+                    openEdit(rule) {
+                        this.store().openEdit(rule);
+                    },
+                    openCopy(rule) {
+                        this.store().openCopy(rule);
+                    },
+                    openDetail(rule) {
+                        this.store().openDetail(rule);
+                    },
+                }));
 
-            Alpine.data('pricingRuleCreatePage', (config) => ({
-                init() {
-                    const store = initStore(config);
-                    store.mode = 'create';
-                    store.resetForm();
-                },
-                store() {
-                    return Alpine.store('pricingRules');
-                },
-            }));
-        });
+                Alpine.data('pricingRuleCreatePage', (config) => ({
+                    init() {
+                        const store = initStore(config);
+                        if (!store) {
+                            console.error('Pricing rules store could not be initialized (Alpine missing).');
+                            return;
+                        }
+                        const hasInitialForm = config.initialForm && Object.keys(config.initialForm).length > 0;
+                        const initialRule = config.initialRule || null;
+
+                        if (initialRule && initialRule.id) {
+                            // Edit mode with existing rule, merge old input if present.
+                            const merged = Object.assign({}, initialRule, hasInitialForm ? config.initialForm : {});
+                            store.openEdit(merged);
+                        } else if (hasInitialForm) {
+                            // Create mode with old input after validation error.
+                            store.mode = 'create';
+                            store.form = Object.assign(store.defaults(), config.initialForm);
+                            store.syncPassengerTypesText();
+                            store.syncCarrierTexts();
+                            store.syncOriginFieldsFromValue();
+                            store.syncDestinationFieldsFromValue();
+                            store.syncCabinModeFromClass();
+                        } else {
+                            store.mode = 'create';
+                            store.resetForm();
+                        }
+                    },
+                    store() {
+                        return Alpine.store('pricingRules');
+                    },
+                }));
+
+                return Alpine.store('pricingRules');
+            };
+
+            
+        })();
     </script>
 @endpush

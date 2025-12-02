@@ -80,6 +80,25 @@ class PricingRuleController extends Controller
         return view('admin.pricing.create', [
             'options' => $this->pricingOptions($seededCarriers),
             'returnUrl' => $request->input('return_url') ?: route('admin.pricing.index'),
+            'rule' => null,
+        ]);
+    }
+
+    public function edit(Request $request, PricingRule $pricingRule): View
+    {
+        $seededCarriers = DB::table('pricing_dropdown_options')
+            ->where('type', 'carriers')
+            ->orderBy('sort_order')
+            ->pluck('value')
+            ->filter()
+            ->values();
+
+        $ruleData = $this->formatRuleForView($pricingRule);
+
+        return view('admin.pricing.edit', [
+            'options' => $this->pricingOptions($seededCarriers),
+            'returnUrl' => $request->input('return_url') ?: route('admin.pricing.index'),
+            'rule' => $ruleData,
         ]);
     }
 
@@ -123,6 +142,51 @@ class PricingRuleController extends Controller
         return redirect()
             ->route('admin.pricing.index')
             ->with('status', $count > 0 ? "Imported {$count} legacy commissions." : 'No legacy commissions needed importing.');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatRuleForView(PricingRule $rule): array
+    {
+        return [
+            'id' => $rule->id,
+            'priority' => $rule->priority,
+            'carrier' => $rule->carrier ?? '',
+            'plating_carrier' => $rule->plating_carrier ?? '',
+            'marketing_carriers_rule' => $rule->marketing_carriers_rule ?? PricingRule::AIRLINE_RULE_NO_RESTRICTION,
+            'operating_carriers_rule' => $rule->operating_carriers_rule ?? PricingRule::AIRLINE_RULE_NO_RESTRICTION,
+            'marketing_carriers' => $rule->marketing_carriers ?? [],
+            'operating_carriers' => $rule->operating_carriers ?? [],
+            'flight_restriction_type' => $rule->flight_restriction_type ?? PricingRule::FLIGHT_RESTRICTION_NONE,
+            'flight_numbers' => $rule->flight_numbers ?? '',
+            'usage' => $rule->usage,
+            'origin' => $rule->origin ?? '',
+            'destination' => $rule->destination ?? '',
+            'both_ways' => (bool) $rule->both_ways,
+            'travel_type' => $rule->travel_type,
+            'cabin_class' => $rule->cabin_class,
+            'booking_class_rbd' => $rule->booking_class_rbd,
+            'booking_class_usage' => $rule->booking_class_usage,
+            'passenger_types' => $rule->passenger_types ?? [],
+            'sales_since' => $rule->sales_since?->format('Y-m-d\TH:i'),
+            'sales_till' => $rule->sales_till?->format('Y-m-d\TH:i'),
+            'departures_since' => $rule->departures_since?->format('Y-m-d\TH:i'),
+            'departures_till' => $rule->departures_till?->format('Y-m-d\TH:i'),
+            'returns_since' => $rule->returns_since?->format('Y-m-d\TH:i'),
+            'returns_till' => $rule->returns_till?->format('Y-m-d\TH:i'),
+            'fare_type' => $rule->fare_type,
+            'promo_code' => $rule->promo_code,
+            'percent' => $rule->percent,
+            'flat_amount' => $rule->flat_amount,
+            'fee_percent' => $rule->fee_percent,
+            'fixed_fee' => $rule->fixed_fee,
+            'is_primary_pcc' => (bool) $rule->is_primary_pcc,
+            'active' => (bool) $rule->active,
+            'notes' => $rule->notes,
+            'calc_basis' => $rule->calc_basis,
+            'kind' => $rule->kind,
+        ];
     }
 
     /**

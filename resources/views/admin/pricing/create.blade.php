@@ -26,251 +26,48 @@
         \App\Models\PricingRule::FLIGHT_RESTRICTION_EXCLUDE_LISTED => 'Exclude listed flights',
     ];
     $carrierOptions = $options['carriers'] ?? [];
-    $countryOptions = $options['countries'] ?? [
-        'AF' => 'Afghanistan',
-        'AL' => 'Albania',
-        'DZ' => 'Algeria',
-        'AS' => 'American Samoa',
-        'AD' => 'Andorra',
-        'AO' => 'Angola',
-        'AI' => 'Anguilla',
-        'AQ' => 'Antarctica',
-        'AG' => 'Antigua and Barbuda',
-        'AR' => 'Argentina',
-        'AM' => 'Armenia',
-        'AW' => 'Aruba',
-        'AU' => 'Australia',
-        'AT' => 'Austria',
-        'AZ' => 'Azerbaijan',
-        'BS' => 'Bahamas',
-        'BH' => 'Bahrain',
-        'BD' => 'Bangladesh',
-        'BB' => 'Barbados',
-        'BY' => 'Belarus',
-        'BE' => 'Belgium',
-        'BZ' => 'Belize',
-        'BJ' => 'Benin',
-        'BM' => 'Bermuda',
-        'BT' => 'Bhutan',
-        'BO' => 'Bolivia',
-        'BA' => 'Bosnia and Herzegovina',
-        'BW' => 'Botswana',
-        'BR' => 'Brazil',
-        'BN' => 'Brunei Darussalam',
-        'BG' => 'Bulgaria',
-        'BF' => 'Burkina Faso',
-        'BI' => 'Burundi',
-        'KH' => 'Cambodia',
-        'CM' => 'Cameroon',
-        'CA' => 'Canada',
-        'CV' => 'Cape Verde',
-        'KY' => 'Cayman Islands',
-        'CF' => 'Central African Republic',
-        'TD' => 'Chad',
-        'CL' => 'Chile',
-        'CN' => 'China',
-        'CX' => 'Christmas Island',
-        'CC' => 'Cocos (Keeling) Islands',
-        'CO' => 'Colombia',
-        'KM' => 'Comoros',
-        'CD' => 'Congo',
-        'CG' => 'Congo',
-        'CK' => 'Cook Islands',
-        'CR' => 'Costa Rica',
-        'CI' => "Cote d'Ivoire",
-        'HR' => 'Croatia',
-        'CU' => 'Cuba',
-        'CW' => 'Curacao',
-        'CY' => 'Cyprus',
-        'CZ' => 'Czech Republic',
-        'DK' => 'Denmark',
-        'DJ' => 'Djibouti',
-        'DM' => 'Dominica',
-        'DO' => 'Dominican Republic',
-        'EC' => 'Ecuador',
-        'EG' => 'Egypt',
-        'SV' => 'El Salvador',
-        'GQ' => 'Equatorial Guinea',
-        'ER' => 'Eritrea',
-        'EE' => 'Estonia',
-        'ET' => 'Ethiopia',
-        'FK' => 'Falkland Islands',
-        'FO' => 'Faroe Islands',
-        'FJ' => 'Fiji',
-        'FI' => 'Finland',
-        'FR' => 'France',
-        'GF' => 'French Guiana',
-        'PF' => 'French Polynesia',
-        'GA' => 'Gabon',
-        'GM' => 'Gambia',
-        'GE' => 'Georgia',
-        'DE' => 'Germany',
-        'GH' => 'Ghana',
-        'GI' => 'Gibraltar',
-        'GR' => 'Greece',
-        'GL' => 'Greenland',
-        'GD' => 'Grenada',
-        'GP' => 'Guadeloupe',
-        'GU' => 'Guam',
-        'GT' => 'Guatemala',
-        'GN' => 'Guinea',
-        'GW' => 'Guinea-Bissau',
-        'GY' => 'Guyana',
-        'HT' => 'Haiti',
-        'HN' => 'Honduras',
-        'HK' => 'Hong Kong (SAR), China',
-        'HU' => 'Hungary',
-        'IS' => 'Iceland',
-        'IN' => 'India',
-        'ID' => 'Indonesia',
-        'IR' => 'Iran',
-        'IQ' => 'Iraq',
-        'IE' => 'Ireland',
-        'IL' => 'Israel',
-        'IT' => 'Italy',
-        'JM' => 'Jamaica',
-        'JP' => 'Japan',
-        'JO' => 'Jordan',
-        'KZ' => 'Kazakstan',
-        'KE' => 'Kenya',
-        'KI' => 'Kiribati',
-        'XK' => 'Kosovo',
-        'KW' => 'Kuwait',
-        'KG' => 'Kyrgyzstan',
-        'LA' => 'Laos',
-        'LV' => 'Latvia',
-        'LB' => 'Lebanon',
-        'LS' => 'Lesotho',
-        'LR' => 'Liberia',
-        'LY' => 'Libyan Arab Jamahiriya',
-        'LI' => 'Liechtenstein',
-        'LT' => 'Lithuania',
-        'LU' => 'Luxembourg',
-        'MO' => 'Macau (SAR), China',
-        'MG' => 'Madagascar',
-        'MW' => 'Malawi',
-        'MY' => 'Malaysia',
-        'MV' => 'Maldives',
-        'ML' => 'Mali',
-        'MT' => 'Malta',
-        'MH' => 'Marshall Islands',
-        'MQ' => 'Martinique',
-        'MR' => 'Mauritania',
-        'MU' => 'Mauritius',
-        'YT' => 'Mayotte',
-        'MX' => 'Mexico',
-        'FM' => 'Micronesia',
-        'MD' => 'Moldova',
-        'MC' => 'Monaco',
-        'MN' => 'Mongolia',
-        'ME' => 'Montenegro',
-        'MS' => 'Montserrat',
-        'MA' => 'Morocco',
-        'MZ' => 'Mozambique',
-        'MM' => 'Myanmar',
-        'NA' => 'Namibia',
-        'NR' => 'Nauru',
-        'NP' => 'Nepal',
-        'NL' => 'Netherlands',
-        'AN' => 'Netherlands Antilles',
-        'NC' => 'New Caledonia',
-        'NZ' => 'New Zealand',
-        'NI' => 'Nicaragua',
-        'NE' => 'Niger',
-        'NG' => 'Nigeria',
-        'NU' => 'Niue',
-        'NF' => 'Norfolk Island',
-        'KP' => 'North Korea',
-        'MK' => 'North Macedonia',
-        'MP' => 'Northern Mariana Islands',
-        'NO' => 'Norway',
-        'PS' => 'Occupied Palestinian Territory',
-        'OM' => 'Oman',
-        'PK' => 'Pakistan',
-        'PW' => 'Palau',
-        'PA' => 'Panama',
-        'PG' => 'Papua New Guinea',
-        'PY' => 'Paraguay',
-        'PE' => 'Peru',
-        'PH' => 'Philippines',
-        'PN' => 'Pitcairn Islands',
-        'PL' => 'Poland',
-        'PT' => 'Portugal',
-        'QA' => 'Qatar',
-        'RE' => 'Reunion',
-        'RO' => 'Romania',
-        'RU' => 'Russian Federation',
-        'RW' => 'Rwanda',
-        'LC' => 'Saint Lucia',
-        'MF' => 'Saint Martin',
-        'VC' => 'Saint Vincent and the Grenadines',
-        'BL' => 'Saint-Barthelemy',
-        'WS' => 'Samoa',
-        'SM' => 'San Marino',
-        'ST' => 'Sao Tome and Principe',
-        'SA' => 'Saudi Arabia',
-        'SN' => 'Senegal',
-        'RS' => 'Serbia',
-        'SC' => 'Seychelles',
-        'SL' => 'Sierra Leone',
-        'SG' => 'Singapore',
-        'SK' => 'Slovakia',
-        'SI' => 'Slovenia',
-        'SB' => 'Solomon Islands',
-        'SO' => 'Somalia',
-        'ZA' => 'South Africa',
-        'KR' => 'South Korea',
-        'SS' => 'South Sudan',
-        'ES' => 'Spain and Canary Islands',
-        'LK' => 'Sri Lanka',
-        'SH' => 'St. Helena',
-        'KN' => 'St. Kitts and Nevis',
-        'PM' => 'St. Pierre and Miquelon',
-        'SD' => 'Sudan',
-        'SR' => 'Suriname',
-        'SJ' => 'Svalbard and Jan Mayen Island',
-        'SZ' => 'Swaziland',
-        'SE' => 'Sweden',
-        'CH' => 'Switzerland',
-        'SY' => 'Syrian Arab Republic',
-        'TW' => 'Taiwan',
-        'TJ' => 'Tajikistan',
-        'TZ' => 'Tanzania',
-        'TH' => 'Thailand',
-        'TG' => 'Togo',
-        'TO' => 'Tonga',
-        'TT' => 'Trinidad and Tobago',
-        'TN' => 'Tunisia',
-        'TR' => 'Turkey',
-        'TM' => 'Turkmenistan',
-        'TC' => 'Turks and Caicos Islands',
-        'TV' => 'Tuvalu',
-        'UG' => 'Uganda',
-        'UA' => 'Ukraine',
-        'AE' => 'United Arab Emirates',
-        'GB' => 'United Kingdom',
-        'US' => 'United States of America',
-        '00' => 'Unknown',
-        'UY' => 'Uruguay',
-        'UM' => 'US Minor Outlying Islands',
-        'UZ' => 'Uzbekistan',
-        'VU' => 'Vanuatu',
-        'VE' => 'Venezuela',
-        'VN' => 'Viet Nam',
-        'VG' => 'Virgin Islands, British',
-        'VI' => 'Virgin Islands, U.S.',
-        'TL' => 'Vychodni Timor',
-        'WF' => 'Wallis and Futuna Islands',
-        'YE' => 'Yemen',
-        'ZM' => 'Zambia',
-        'ZW' => 'Zimbabwe',
-    ];
-    $locationTypeOptions = [
-        'airport' => 'Airport',
-        'city' => 'City',
-        'station' => 'Station',
+    $countryOptions = $options['countries'] ?? []; // Assuming empty is fine for create
+    $locationTypeOptions = [ 'airport' => 'Airport', 'city' => 'City', 'station' => 'Station' ];
+
+    // Provide default values for the create form
+    $ruleFields = [
+        'priority' => old('priority', 0),
+        'usage' => old('usage', 'commission_base'),
+        'notes' => old('notes', ''),
+        'carrier' => old('carrier', ''),
+        'plating_carrier' => old('plating_carrier', ''),
+        'marketing_carriers_rule' => old('marketing_carriers_rule', ''),
+        'marketing_carriers' => old('marketing_carriers', ''),
+        'operating_carriers_rule' => old('operating_carriers_rule', ''),
+        'operating_carriers' => old('operating_carriers', ''),
+        'flight_restriction_type' => old('flight_restriction_type', \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE),
+        'flight_numbers' => old('flight_numbers', ''),
+        'percent' => old('percent', ''),
+        'flat_amount' => old('flat_amount', ''),
+        'fee_percent' => old('fee_percent', ''),
+        'fixed_fee' => old('fixed_fee', ''),
+        'promo_code' => old('promo_code', ''),
+        'origin' => old('origin', ''),
+        'destination' => old('destination', ''),
+        'both_ways' => old('both_ways', false),
+        'travel_type' => old('travel_type', 'OW+RT'),
+        'cabin_class' => old('cabin_class', ''),
+        'booking_class_usage' => old('booking_class_usage', \App\Models\PricingRule::BOOKING_CLASS_USAGE_AT_LEAST_ONE),
+        'booking_class_rbd' => old('booking_class_rbd', ''),
+        'passenger_types' => old('passenger_types', []),
+        'fare_type' => old('fare_type', 'public_and_private'),
+        'sales_since' => old('sales_since', ''),
+        'sales_till' => old('sales_till', ''),
+        'departures_since' => old('departures_since', ''),
+        'departures_till' => old('departures_till', ''),
+        'returns_since' => old('returns_since', ''),
+        'returns_till' => old('returns_till', ''),
+        'is_primary_pcc' => old('is_primary_pcc', '0'),
+        'active' => old('active', true),
     ];
 @endphp
+
+
 
 <x-app-layout>
     <x-slot name="header">
@@ -286,18 +83,11 @@
     </x-slot>
 
     <div class="py-6">
-        <div
-            class="mx-auto max-w-5xl sm:px-6 lg:px-8"
-            x-data="pricingRuleCreatePage({
-                createUrl: '{{ route('admin.pricing.rules.store') }}',
-                updateBaseUrl: '{{ url('/admin/pricing/rules') }}',
-                returnUrl: '{{ $returnUrl ?? route('admin.pricing.index') }}'
-            })"
-        >
+        <div class="mx-auto max-w-5xl sm:px-6 lg:px-8">
             <div class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
-                <form method="POST" :action="$store.pricingRules.formAction()" class="space-y-6" x-ref="ruleForm">
+                <form method="POST" action="{{ route('admin.pricing.rules.store') }}" class="space-y-6">
                     @csrf
-                    <input type="hidden" name="return_url" :value="$store.pricingRules.config.returnUrl">
+                    <input type="hidden" name="return_url" value="{{ $returnUrl }}">
 
                     @if ($errors->any())
                         <div class="rounded border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">
@@ -310,11 +100,11 @@
                         </div>
                     @endif
 
-                    @include('admin.pricing.partials.rule-form-fields')
+                    @include('admin.pricing.partials.rule-form-fields-simple')
 
                     <div class="mt-4 flex flex-col gap-3 border-t border-gray-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
                         <label class="flex items-center gap-2 text-sm text-gray-700">
-                            <input id="rule_active" type="checkbox" name="active" value="1" x-model="$store.pricingRules.form.active"
+                            <input id="rule_active" type="checkbox" name="active" value="1" @if($ruleFields['active']) checked @endif
                                    class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
                             <span>Rule is active</span>
                         </label>
@@ -323,13 +113,13 @@
                             <a href="{{ route('admin.pricing.index') }}" class="text-sm text-gray-600 hover:text-gray-800">
                                 Cancel
                             </a>
-                            <x-primary-button>Create rule</x-primary-button>
+                            <x-primary-button>
+                                Create rule
+                            </x-primary-button>
                         </div>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-
-    @include('admin.pricing.partials.pricing-rule-scripts')
 </x-app-layout>
