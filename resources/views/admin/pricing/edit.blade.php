@@ -20,6 +20,11 @@
         'N' => 'Not operated by',
         'A' => 'Must contain all of the listed',
     ];
+    $platingCarrierRuleOptions = [
+        '' => 'Without restrictions',
+        'only' => 'Only listed are authorized',
+        'except' => 'Not operated by',
+    ];
     $flightRestrictionOptions = [
         \App\Models\PricingRule::FLIGHT_RESTRICTION_NONE => 'Do not restrict',
         \App\Models\PricingRule::FLIGHT_RESTRICTION_ONLY_LISTED => 'Only listed flights',
@@ -298,41 +303,55 @@
                     <input type="hidden" name="return_url" value="{{ $returnUrl }}">
 
                     @php
-                        $ruleFields = [
-                            'priority' => old('priority', $rule['priority'] ?? 0),
-                            'usage' => old('usage', $rule['usage'] ?? ''),
-                            'notes' => old('notes', $rule['notes'] ?? ''),
-                            'carrier' => old('carrier', $rule['carrier'] ?? ''),
-                            'plating_carrier' => old('plating_carrier', $rule['plating_carrier'] ?? ''),
-                            'marketing_carriers_rule' => old('marketing_carriers_rule', $rule['marketing_carriers_rule'] ?? ''),
-                            'marketing_carriers' => implode(', ', old('marketing_carriers', $rule['marketing_carriers'] ?? [])),
-                            'operating_carriers_rule' => old('operating_carriers_rule', $rule['operating_carriers_rule'] ?? ''),
-                            'operating_carriers' => implode(', ', old('operating_carriers', $rule['operating_carriers'] ?? [])),
-                            'flight_restriction_type' => old('flight_restriction_type', $rule['flight_restriction_type'] ?? ''),
-                            'flight_numbers' => old('flight_numbers', $rule['flight_numbers'] ?? ''),
-                            'percent' => old('percent', $rule['percent'] ?? ''),
-                            'flat_amount' => old('flat_amount', $rule['flat_amount'] ?? ''),
-                            'fee_percent' => old('fee_percent', $rule['fee_percent'] ?? ''),
-                            'fixed_fee' => old('fixed_fee', $rule['fixed_fee'] ?? ''),
-                            'promo_code' => old('promo_code', $rule['promo_code'] ?? ''),
-                            'origin' => old('origin', $rule['origin'] ?? ''),
-                            'destination' => old('destination', $rule['destination'] ?? ''),
-                            'both_ways' => old('both_ways', $rule['both_ways'] ?? false),
-                            'travel_type' => old('travel_type', $rule['travel_type'] ?? 'OW+RT'),
-                            'cabin_class' => old('cabin_class', $rule['cabin_class'] ?? ''),
-                            'booking_class_usage' => old('booking_class_usage', $rule['booking_class_usage'] ?? ''),
-                            'booking_class_rbd' => old('booking_class_rbd', $rule['booking_class_rbd'] ?? ''),
-                            'passenger_types' => old('passenger_types', $rule['passenger_types'] ?? []),
-                            'fare_type' => old('fare_type', $rule['fare_type'] ?? 'public_and_private'),
-                            'sales_since' => old('sales_since', $rule['sales_since'] ?? ''),
-                            'sales_till' => old('sales_till', $rule['sales_till'] ?? ''),
-                            'departures_since' => old('departures_since', $rule['departures_since'] ?? ''),
-                            'departures_till' => old('departures_till', $rule['departures_till'] ?? ''),
-                            'returns_since' => old('returns_since', $rule['returns_since'] ?? ''),
-                            'returns_till' => old('returns_till', $rule['returns_till'] ?? ''),
-                            'is_primary_pcc' => old('is_primary_pcc', $rule['is_primary_pcc'] ?? '0'),
-                            'active' => old('active', $rule['active'] ?? false),
-                        ];
+        $implodeList = function ($value) {
+            if (is_array($value)) {
+                return implode(', ', $value);
+            }
+            if (is_string($value)) {
+                return $value;
+            }
+            return '';
+        };
+
+        $ruleFields = [
+            'priority' => old('priority', $rule['priority'] ?? 0),
+            'usage' => old('usage', $rule['usage'] ?? ''),
+            'notes' => old('notes', $rule['notes'] ?? ''),
+            'plating_carrier_rule' => old('plating_carrier_rule', $rule['plating_carrier_rule'] ?? ''),
+            'carrier' => old('carrier', $rule['carrier'] ?? ''),
+            'plating_carrier' => $implodeList(old('plating_carrier', $rule['plating_carrier'] ?? [])),
+            'marketing_carriers_rule' => old('marketing_carriers_rule', $rule['marketing_carriers_rule'] ?? ''),
+            'marketing_carriers' => $implodeList(old('marketing_carriers', $rule['marketing_carriers'] ?? [])),
+            'operating_carriers_rule' => old('operating_carriers_rule', $rule['operating_carriers_rule'] ?? ''),
+            'operating_carriers' => $implodeList(old('operating_carriers', $rule['operating_carriers'] ?? [])),
+            'flight_restriction_type' => old('flight_restriction_type', $rule['flight_restriction_type'] ?? ''),
+            'flight_numbers' => old('flight_numbers', $rule['flight_numbers'] ?? ''),
+            'percent' => old('percent', $rule['percent'] ?? ''),
+            'flat_amount' => old('flat_amount', $rule['flat_amount'] ?? ''),
+            'fee_percent' => old('fee_percent', $rule['fee_percent'] ?? ''),
+            'fixed_fee' => old('fixed_fee', $rule['fixed_fee'] ?? ''),
+            'promo_code' => old('promo_code', $rule['promo_code'] ?? ''),
+            'origin' => old('origin', $rule['origin'] ?? ''),
+            'origin_prefer_same_code' => old('origin_prefer_same_code', $rule['origin_prefer_same_code'] ?? false),
+            'destination' => old('destination', $rule['destination'] ?? ''),
+            'destination_prefer_same_code' => old('destination_prefer_same_code', $rule['destination_prefer_same_code'] ?? false),
+            'both_ways' => old('both_ways', $rule['both_ways'] ?? false),
+            'travel_type' => old('travel_type', $rule['travel_type'] ?? 'OW+RT'),
+            'cabin_class' => old('cabin_class', $rule['cabin_class'] ?? ''),
+            'cabin_mode' => old('cabin_mode', $rule['cabin_mode'] ?? ''),
+            'booking_class_usage' => old('booking_class_usage', $rule['booking_class_usage'] ?? ''),
+            'booking_class_rbd' => old('booking_class_rbd', $rule['booking_class_rbd'] ?? ''),
+            'passenger_types' => old('passenger_types', $rule['passenger_types'] ?? []),
+            'fare_type' => old('fare_type', $rule['fare_type'] ?? 'public_and_private'),
+            'sales_since' => old('sales_since', $rule['sales_since'] ?? ''),
+            'sales_till' => old('sales_till', $rule['sales_till'] ?? ''),
+            'departures_since' => old('departures_since', $rule['departures_since'] ?? ''),
+            'departures_till' => old('departures_till', $rule['departures_till'] ?? ''),
+            'returns_since' => old('returns_since', $rule['returns_since'] ?? ''),
+            'returns_till' => old('returns_till', $rule['returns_till'] ?? ''),
+            'is_primary_pcc' => old('is_primary_pcc', $rule['is_primary_pcc'] ?? '0'),
+            'active' => old('active', $rule['active'] ?? false),
+        ];
                     @endphp
 
                     @include('admin.pricing.partials.rule-form-fields-simple')

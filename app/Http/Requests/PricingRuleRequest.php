@@ -30,7 +30,9 @@ class PricingRuleRequest extends FormRequest
             'flight_numbers' => ['nullable', 'string'],
             'usage' => ['required', Rule::in(PricingRule::usageOptions())],
             'origin' => ['nullable', 'string', 'size:3'],
+            'origin_prefer_same_code' => ['sometimes', 'boolean'],
             'destination' => ['nullable', 'string', 'size:3'],
+            'destination_prefer_same_code' => ['sometimes', 'boolean'],
             'both_ways' => ['sometimes', 'boolean'],
             'travel_type' => ['nullable', Rule::in(['OW', 'RT', 'OW+RT'])],
             'cabin_class' => ['nullable', Rule::in(['Economy', 'Premium Economy', 'Business', 'First', 'Premium First'])],
@@ -108,7 +110,9 @@ class PricingRuleRequest extends FormRequest
             ),
             'flight_numbers' => $this->normalizeFlightNumbers($this->input('flight_numbers')),
             'origin' => $this->nullIfWildcard($this->normalizeIata($this->input('origin'))),
+            'origin_prefer_same_code' => $this->boolean('origin_prefer_same_code'),
             'destination' => $this->nullIfWildcard($this->normalizeIata($this->input('destination'))),
+            'destination_prefer_same_code' => $this->boolean('destination_prefer_same_code'),
             'travel_type' => $this->normalizeEnum($this->input('travel_type'), ['OW', 'RT', 'OW+RT'], null),
             'cabin_class' => $this->normalizeEnum($this->input('cabin_class'), ['Economy', 'Premium Economy', 'Business', 'First', 'Premium First'], null),
             'booking_class_rbd' => $this->nullIfWildcard($this->normalizeString($this->input('booking_class_rbd'))),
@@ -163,6 +167,8 @@ class PricingRuleRequest extends FormRequest
             'both_ways' => (bool) $this->validated('both_ways'),
             'is_primary_pcc' => (bool) $this->validated('is_primary_pcc'),
             'active' => (bool) $this->validated('active'),
+            'origin_prefer_same_code' => (bool) $this->validated('origin_prefer_same_code'),
+            'destination_prefer_same_code' => (bool) $this->validated('destination_prefer_same_code'),
             'calc_basis' => $this->resolveCalcBasis($this->validated('usage')),
         ]);
     }
