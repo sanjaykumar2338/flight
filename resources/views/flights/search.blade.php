@@ -678,7 +678,9 @@
                                                         @forelse ($offer['segments'] as $segment)
                                                             <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
                                                                 <div class="flex flex-wrap items-center justify-between gap-2">
-                                                                    <span class="text-sm font-semibold text-slate-800">
+                                                                    <span class="text-sm font-semibold text-slate-800 segment-route"
+                                                                          data-origin="{{ $segment['origin'] ?? '' }}"
+                                                                          data-destination="{{ $segment['destination'] ?? '' }}">
                                                                         {{ $segment['origin'] ?? '---' }} → {{ $segment['destination'] ?? '---' }}
                                                                     </span>
                                                                     <span class="text-xs text-gray-500">
@@ -1935,5 +1937,44 @@
                     bindStripeButtons();
                 }
             })();
+        </script>
+        <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const routeNodes = Array.from(document.querySelectorAll('.segment-route'));
+                if (!routeNodes.length) return;
+
+                let airportMap = null;
+                const loadAirports = async () => {
+                    if (airportMap) return airportMap;
+                    try {
+                        const resp = await fetch('/airports.json');
+                        const data = await resp.json();
+                        airportMap = new Map();
+                        (Array.isArray(data) ? data : []).forEach((a) => {
+                            const code = (a.iata_code || a.iata || '').toUpperCase();
+                            if (!code) return;
+                            const city = a.city || '';
+                            const country = a.country || '';
+                            const name = a.name || '';
+                            const display = city && country ? `${city}, ${country} (${code})` : name ? `${name} (${code})` : code;
+                            airportMap.set(code, display);
+                        });
+                    } catch (e) {
+                        console.warn('Unable to load airports.json for display names', e);
+                        airportMap = new Map();
+                    }
+                    return airportMap;
+                };
+
+                loadAirports().then((map) => {
+                    routeNodes.forEach((node) => {
+                        const origin = (node.dataset.origin || '').toUpperCase();
+                        const dest = (node.dataset.destination || '').toUpperCase();
+                        const originText = map.get(origin) || origin || '---';
+                        const destText = map.get(dest) || dest || '---';
+                        node.textContent = `${originText} → ${destText}`;
+                    });
+                });
+            });
         </script>
 </x-app-layout>
