@@ -1,4 +1,4 @@
-const DATA_URL = '/data/airports.json';
+const DATA_URL = '/airports.json';
 const TRENDING_CODES = ['DXB', 'LHR', 'JFK', 'SIN', 'CDG', 'SYD', 'LOS', 'AMS', 'HKG', 'GRU'];
 const NEARBY_RADIUS_KM = 250;
 
